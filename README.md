@@ -5,5 +5,5 @@ ansonsten:
 pip install pygame
 
 dann noch: 
-pip install numpy
+pip install numpy und 
 pip install stable-baselines3 torch
