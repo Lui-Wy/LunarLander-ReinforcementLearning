@@ -4,7 +4,8 @@ import torch.optim as optim
 import random
 import numpy as np
 from collections import deque
-from codeForAI import LunarLanderEnv
+
+from AIGame.codeForAI import LunarLanderEnv
 
 # --- NEURONALES NETZ (Das Gehirn) ---
 class DQN(nn.Module):
@@ -30,6 +31,7 @@ MIN_REPLAY_SIZE = 1000
 EPSILON_START = 1.0
 EPSILON_END = 0.05
 EPSILON_DECAY = 0.995
+EPISODES_TO_TRAIN = 500 # Trainiere so viele Episoden
 
 def main():
     env = LunarLanderEnv(render_mode=False)
@@ -47,7 +49,7 @@ def main():
     epsilon = EPSILON_START
 
     
-    for episode in range(500): # 500 Episoden trainieren
+    for episode in range(EPISODES_TO_TRAIN):
         state = env.reset()
         episode_reward = 0
         done = False
