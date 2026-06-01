@@ -34,7 +34,7 @@ EPSILON_END = 0.05
 EPSILON_DECAY = 0.995
 EPISODES_TO_TRAIN = 1000 # Trainiere so viele Episoden
 
-def save_graph(episode_rewards: list):
+def save_graph(episode_rewards: list, epsilon_values: list):
     window = 50
 
     moving_avg = np.convolve(
@@ -43,23 +43,48 @@ def save_graph(episode_rewards: list):
         mode='valid'
     )
 
-    plt.figure(figsize=(12, 6))
+    fig, ax1 = plt.subplots(figsize=(14, 7))
 
-    plt.plot(episode_rewards, alpha=0.3, label="Reward")
-    plt.plot(
+    # Rohdaten
+    ax1.plot(
+        episode_rewards,
+        alpha=0.2,
+        label="Reward"
+    )
+
+    # Durchschnitt
+    ax1.plot(
         range(window - 1, len(episode_rewards)),
         moving_avg,
         linewidth=2,
-        label="50-Episoden Durchschnitt"
+        label="50 Episoden Durchschnitt"
     )
 
-    plt.title("Lunar Lander Training")
-    plt.xlabel("Episode")
-    plt.ylabel("Reward")
-    plt.legend()
-    plt.grid(True)
+    ax1.set_xlabel("Episode")
+    ax1.set_ylabel("Reward")
 
-    plt.savefig("reward_graph.png", dpi=300)
+    # Epsilon rechts
+    ax2 = ax1.twinx()
+    ax2.plot(
+        epsilon_values,
+        linestyle="--",
+        linewidth=2,
+        label="Epsilon"
+    )
+    ax2.set_ylabel("Epsilon")
+
+    # Gemeinsame Legende
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+
+    ax1.legend(
+        lines1 + lines2,
+        labels1 + labels2,
+        loc="upper left"
+    )
+
+    plt.title("Lunar Lander DQN Training")
+    plt.savefig("training_progress.png", dpi=300, bbox_inches="tight")
     plt.close()
 
 def main():
@@ -76,7 +101,10 @@ def main():
     # Erfahrungsspeicher (Replay Buffer)
     replay_buffer = deque(maxlen=MEMORY_SIZE)
     epsilon = EPSILON_START
+
+    # Cache für den Graphen
     episode_rewards = []
+    epsilon_values = []
 
     
     for episode in range(EPISODES_TO_TRAIN):
@@ -131,6 +159,7 @@ def main():
         epsilon = max(EPSILON_END, epsilon * EPSILON_DECAY)
         
         episode_rewards.append(episode_reward)
+        epsilon_values.append(epsilon)
 
         # Target-Netzwerk regelmäßig synchronisieren
         if episode % 10 == 0:
@@ -139,7 +168,7 @@ def main():
 
     # Modell manuell speichern
     torch.save(q_net.state_dict(), "dataFromTraining.pth")
-    save_graph(episode_rewards)
+    save_graph(episode_rewards, epsilon_values)
     print("Training beendet. Modell gespeichert!")
 
 if __name__ == "__main__":

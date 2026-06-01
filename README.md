@@ -54,7 +54,7 @@ KI trainieren:
     Das Modell wird nach abschluss des Trainings in "dataFromTraining.pth" gespeichert. 
     !!!Sichere also ältere Trainingsmodelle unter einem anderen Namen, sonst werden diese überschrieben!!!
 
-    Zusätzlich Lernerfolg beim Training (Reward) in als "reward_graph" abgespeichert.
+    Zusätzlich Lernerfolg beim Training (Reward) und der Zufallswert als "training_progress.png" abgespeichert.
 
 Trainierte KI testen:
     "python -m AIGame.realTestOfAI"
