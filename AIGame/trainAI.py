@@ -31,14 +31,14 @@ MIN_REPLAY_SIZE = 1000
 EPSILON_START = 1.0
 EPSILON_END = 0.05
 EPSILON_DECAY = 0.995
-EPISODES_TO_TRAIN = 500 # Trainiere so viele Episoden
+EPISODES_TO_TRAIN = 300 # Trainiere so viele Episoden
 
 def main():
     env = LunarLanderEnv(render_mode=False)
     
     # Netzwerke initialisieren (Online-Netz und stabiles Target-Netz)
-    q_net = DQN(6, 4)
-    target_net = DQN(6, 4)
+    q_net = DQN(8, 4)
+    target_net = DQN(8, 4)
     target_net.load_state_dict(q_net.state_dict())
     
     optimizer = optim.Adam(q_net.parameters(), lr=LR)

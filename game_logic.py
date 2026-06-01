@@ -1,4 +1,5 @@
 import math
+import random
 
 WORLD_WIDTH = 800
 WORLD_HEIGHT = 600
@@ -58,12 +59,17 @@ class Lander:
 
 class GameState:
     def __init__(self):
-        self.pad_x_start = 350
-        self.pad_x_end = 450
+        self.pad_width = 100
         self.pad_y = 550
+        self.randomize_pad()
         self.lander = Lander(WORLD_WIDTH // 2, 100)
 
+    def randomize_pad(self):
+        self.pad_x_start = random.randint(0, WORLD_WIDTH - self.pad_width)
+        self.pad_x_end = self.pad_x_start + self.pad_width
+
     def reset(self):
+        self.randomize_pad()
         self.lander = Lander(WORLD_WIDTH // 2, 100)
 
     def set_inputs(self, main_thrust, rotate_right, rotate_left):
@@ -84,7 +90,6 @@ class GameState:
 
         if lander.y >= self.pad_y - 15:
             if self.pad_x_start <= lander.x <= self.pad_x_end:
-                abs((lander.angle + 180) % 360 - 180)
                 if (
                     abs(lander.vy) < SAFE_LANDING_VY and
                     abs(lander.vx) < SAFE_LANDING_VX and
