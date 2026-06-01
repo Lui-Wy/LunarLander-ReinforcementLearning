@@ -4,6 +4,7 @@ import torch.optim as optim
 import random
 import numpy as np
 from collections import deque
+import matplotlib.pyplot as plt
 
 from AIGame.codeForAI import LunarLanderEnv
 
@@ -31,7 +32,35 @@ MIN_REPLAY_SIZE = 1000
 EPSILON_START = 1.0
 EPSILON_END = 0.05
 EPSILON_DECAY = 0.995
-EPISODES_TO_TRAIN = 300 # Trainiere so viele Episoden
+EPISODES_TO_TRAIN = 1000 # Trainiere so viele Episoden
+
+def save_graph(episode_rewards: list):
+    window = 50
+
+    moving_avg = np.convolve(
+        episode_rewards,
+        np.ones(window) / window,
+        mode='valid'
+    )
+
+    plt.figure(figsize=(12, 6))
+
+    plt.plot(episode_rewards, alpha=0.3, label="Reward")
+    plt.plot(
+        range(window - 1, len(episode_rewards)),
+        moving_avg,
+        linewidth=2,
+        label="50-Episoden Durchschnitt"
+    )
+
+    plt.title("Lunar Lander Training")
+    plt.xlabel("Episode")
+    plt.ylabel("Reward")
+    plt.legend()
+    plt.grid(True)
+
+    plt.savefig("reward_graph.png", dpi=300)
+    plt.close()
 
 def main():
     env = LunarLanderEnv(render_mode=False)
@@ -47,6 +76,7 @@ def main():
     # Erfahrungsspeicher (Replay Buffer)
     replay_buffer = deque(maxlen=MEMORY_SIZE)
     epsilon = EPSILON_START
+    episode_rewards = []
 
     
     for episode in range(EPISODES_TO_TRAIN):
@@ -100,6 +130,8 @@ def main():
         # Epsilon verringern (weniger Zufall mit der Zeit)
         epsilon = max(EPSILON_END, epsilon * EPSILON_DECAY)
         
+        episode_rewards.append(episode_reward)
+
         # Target-Netzwerk regelmäßig synchronisieren
         if episode % 10 == 0:
             target_net.load_state_dict(q_net.state_dict())
@@ -107,6 +139,7 @@ def main():
 
     # Modell manuell speichern
     torch.save(q_net.state_dict(), "dataFromTraining.pth")
+    save_graph(episode_rewards)
     print("Training beendet. Modell gespeichert!")
 
 if __name__ == "__main__":

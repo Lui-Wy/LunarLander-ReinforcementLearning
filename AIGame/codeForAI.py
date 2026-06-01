@@ -101,7 +101,18 @@ class LunarLanderEnv:
             reward += abs(lander.vx) / 100.0
 
         # Lander soll langsam und gerade bleiben
-        reward -= abs(lander.vy) / 200.0
+        height_above_pad = max(0, self.game_state.pad_y - lander.y)
+
+        # Ziel: weiter oben schneller sinken, nahe Plattform langsamer sinken
+        if height_above_pad > 250:
+            target_vy = 120
+        elif height_above_pad > 100:
+            target_vy = 80
+        else:
+            target_vy = 35
+
+        # vy ist positiv nach unten
+        reward -= abs(lander.vy - target_vy) / 100.0
         reward -= angle_error * 1.0
 
         # nicht ewig fliegen / Treibstoff sparen
