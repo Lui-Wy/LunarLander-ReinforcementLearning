@@ -3,11 +3,12 @@ import random
 import numpy as np
 import pygame
 
-from game_logic import GameState, WORLD_WIDTH, WORLD_HEIGHT
+from game_logic import MAX_FUEL, GameState, WORLD_WIDTH, WORLD_HEIGHT
 from HumanGame.rendering import draw_screen
 
 PHYSICS_FPS = 60
 PHYSICS_DT = 1.0 / PHYSICS_FPS
+VELOCITY_NORM = 300.0
 
 class LunarLanderEnv:
     def __init__(self, render_mode=False):
@@ -52,10 +53,10 @@ class LunarLanderEnv:
         return np.array([
             lander.x / WORLD_WIDTH,
             lander.y / WORLD_HEIGHT,
-            lander.vx / 300.0,
-            lander.vy / 300.0,
+            lander.vx / VELOCITY_NORM,
+            lander.vy / VELOCITY_NORM,
             angle_norm,
-            lander.fuel / 500.0,
+            lander.fuel / MAX_FUEL,
             pad_center_x / WORLD_WIDTH,
             (lander.x - pad_center_x) / WORLD_WIDTH
         ], dtype=np.float32)
@@ -75,6 +76,7 @@ class LunarLanderEnv:
         dx = (lander.x - pad_center_x) / WORLD_WIDTH
 
         # Berechne Rotationsabweichung vom "aufrechten" Zustand
+        # Bringe Rotation auf [-180|180] -> [-1|1]
         angle_error = abs((lander.angle + 180) % 360 - 180) / 180
 
         # Berechne Annäherung an die Plattform
@@ -84,13 +86,13 @@ class LunarLanderEnv:
 
         reward = 0.0
 
-        # Belohne Bewegung in Richtung Plattform
-        reward += distance_improvement * 50.0
-
         # Bestrafe aktuellen Abstand
         reward -= current_distance * 2.0
 
-        # zusätzlich horizontalen Fehler stärker bestrafen
+        # Belohne Bewegung in Richtung Plattform
+        reward += distance_improvement * 50.0
+
+        # zusätzlich horizontalen Fehler stärker bestrafen -> Forcieren, dass die Rakete versucht über der Plattform zu bleiben
         reward -= abs(dx) * 3.0
 
         # Seitliche Geschwindigkeit bestrafen,

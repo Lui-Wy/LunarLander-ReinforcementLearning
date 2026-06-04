@@ -80,7 +80,7 @@ def save_graph(episode_rewards: list, epsilon_values: list):
     ax1.legend(
         lines1 + lines2,
         labels1 + labels2,
-        loc="upper left"
+        loc="lower left",
     )
 
     plt.title("Lunar Lander DQN Training")

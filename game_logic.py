@@ -7,6 +7,7 @@ WORLD_HEIGHT = 600
 GRAVITY = 180
 THRUST = 500
 ROTATE_SPEED = 180
+MAX_FUEL = 500
 FUEL_REQ_MAIN = 100
 FUEL_REQ_ROTATION = 20
 
@@ -24,7 +25,7 @@ class Lander:
         self.vy = 0.0
         self.angle = 0.0
 
-        self.fuel = 500
+        self.fuel = MAX_FUEL
         self.is_alive = True
         self.has_landed = False
 
