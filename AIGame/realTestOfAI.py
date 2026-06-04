@@ -5,8 +5,8 @@ from AIGame.trainAI import DQN
 
 def main():
     env = LunarLanderEnv(render_mode=True)
-    q_net = DQN(6, 4)
-    q_net.load_state_dict(torch.load("dataFromTraining_1.pth"))
+    q_net = DQN(8, 4)
+    q_net.load_state_dict(torch.load("dataFromTraining_2.pth"))
     q_net.eval() # Netzwerk in Testmodus versetzen
 
     for episode in range(5):
