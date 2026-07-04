@@ -66,6 +66,7 @@ def reset_round(ai_state: GameState, human_state: GameState) -> None:
         state.pad_x_start = pad_x_start
         state.pad_x_end = pad_x_end
         state.lander = Lander(WORLD_WIDTH // 2, 100)
+        state.flight_time = 0.0
 
 
 def get_side_rects(screen: pygame.Surface) -> tuple[pygame.Rect, pygame.Rect]:
@@ -184,7 +185,7 @@ def main():
         draw_header(screen, header_font, left_rect, right_rect)
 
         if round_over:
-            message = header_font.render("Beide Seiten fertig - R fuer neue Runde", True, WHITE)
+            message = header_font.render("Beide Seiten fertig - R für neue Runde", True, WHITE)
             screen.blit(message, message.get_rect(center=(screen.get_width() // 2, HEADER_HEIGHT // 2)))
 
         pygame.display.flip()

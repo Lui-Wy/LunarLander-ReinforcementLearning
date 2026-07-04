@@ -219,6 +219,11 @@ def draw_screen(screen, font, game_state):
         draw_centered_text(screen, font, "CRASH! Drücke R für Reset", RED)
 
     elif lander.has_landed:
-        draw_centered_text(screen, font, "ERFOLGREICHE LANDUNG! Drücke R für Reset", GREEN)
+        draw_centered_text(
+            screen,
+            font,
+            f"ERFOLGREICHE LANDUNG! Zeit: {game_state.flight_time:.2f}s - Drücke R für Reset",
+            GREEN
+        )
 
     pygame.display.flip()

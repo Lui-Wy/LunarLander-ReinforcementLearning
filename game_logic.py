@@ -64,6 +64,7 @@ class GameState:
         self.pad_y = 550
         self.randomize_pad()
         self.lander = Lander(WORLD_WIDTH // 2, 100)
+        self.flight_time = 0.0
 
     def randomize_pad(self):
         self.pad_x_start = random.randint(0, WORLD_WIDTH - self.pad_width)
@@ -72,6 +73,7 @@ class GameState:
     def reset(self):
         self.randomize_pad()
         self.lander = Lander(WORLD_WIDTH // 2, 100)
+        self.flight_time = 0.0
 
     def set_inputs(self, main_thrust, rotate_right, rotate_left):
         lander = self.lander
@@ -87,6 +89,10 @@ class GameState:
 
     def update(self, dt: float):
         lander = self.lander
+
+        if lander.is_alive and not lander.has_landed:
+            self.flight_time += dt
+
         lander.update(dt)
 
         if lander.y >= self.pad_y - 15:
