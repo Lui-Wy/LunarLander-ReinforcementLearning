@@ -13,6 +13,10 @@ LunarLander-ReinforcementLearning/
 │   ├── trainAI.py
 │   └── realTestOfAI.py
 │
+├── VersusGame/
+│   ├── __init__.py
+│   └── main.py
+│
 ├── requirements.txt
 └── README.md
 
@@ -60,3 +64,17 @@ Trainierte KI testen:
     "python -m AIGame.realTestOfAI"
     
     verwendet das aktuell unter dem Namen "dataFromTraining.pth" gespeicherte Modell für den Test. 
+
+Versus-Modus (KI gegen Mensch, Splitscreen):
+    "python -m VersusGame.main"
+
+    verwendet das aktuell unter dem Namen "dataFromTraining_2.pth" gespeicherte Modell für die KI-Seite.
+    Beide Seiten starten in jeder Runde mit identischer Startposition und identischer Plattformposition.
+
+    Steuerung (menschliche Seite, rechts):
+    | Taste              | Aktion                      |
+    | ------------------ | --------------------------- |
+    | Pfeil hoch / SPACE | Haupttriebwerk              |
+    | Pfeil links        | Nach links rotieren         |
+    | Pfeil rechts       | Nach rechts rotieren        |
+    | R                  | Neue Runde, sobald beide Seiten gelandet oder gecrasht sind |

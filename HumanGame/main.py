@@ -20,7 +20,7 @@ def main():
         pygame.RESIZABLE
     )
 
-    pygame.display.set_caption("Lunar Lander - getrennte Logik und Darstellung")
+    pygame.display.set_caption("Lunar Lander - Human Play")
 
     clock = pygame.time.Clock()
     font = pygame.font.SysFont(None, 24)
