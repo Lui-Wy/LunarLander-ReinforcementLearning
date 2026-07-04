@@ -16,6 +16,14 @@ SAFE_LANDING_VY = 80
 SAFE_LANDING_VX = 50
 SAFE_LANDING_ANGLE = 10
 
+# Meteor: Größe/Geschwindigkeit werden bei jedem (Neu-)Spawn zufällig innerhalb dieser Grenzen bestimmt
+METEOR_MIN_RADIUS = 20
+METEOR_MAX_RADIUS = 45
+METEOR_MIN_SPEED = 80
+METEOR_MAX_SPEED = 220
+
+LANDER_COLLISION_RADIUS = 12
+
 
 class Lander:
     def __init__(self, x, y):
@@ -58,6 +66,74 @@ class Lander:
         self.y += self.vy * dt
 
 
+class Meteor:
+    TRAIL_LENGTH = 20
+    STREAK_COUNT = 4
+    STREAK_ANGLE_SPREAD = 50
+    STREAK_MIN_LENGTH_FACTOR = 0.4
+    STREAK_MAX_LENGTH_FACTOR = 1.3
+
+    def __init__(self, x, y, vx, vy, radius):
+        self.x = x
+        self.y = y
+        self.vx = vx
+        self.vy = vy
+        self.radius = radius
+        self.trail = []
+
+        # Winkel-Offset und Längenfaktor je Schweif-Dreieck, einmalig pro Meteor bestimmt
+        self.streaks = [
+            (
+                random.uniform(-self.STREAK_ANGLE_SPREAD, self.STREAK_ANGLE_SPREAD),
+                random.uniform(self.STREAK_MIN_LENGTH_FACTOR, self.STREAK_MAX_LENGTH_FACTOR)
+            )
+            for _ in range(self.STREAK_COUNT)
+        ]
+
+    def update(self, dt: float):
+        self.trail.append((self.x, self.y))
+        if len(self.trail) > self.TRAIL_LENGTH:
+            self.trail.pop(0)
+
+        self.x += self.vx * dt
+        self.y += self.vy * dt
+
+    def is_off_screen(self) -> bool:
+        """True, sobald der Meteor die Szene komplett (inkl. Radius) verlassen hat."""
+        return (
+            self.x + self.radius < 0 or
+            self.x - self.radius > WORLD_WIDTH or
+            self.y + self.radius < 0 or
+            self.y - self.radius > WORLD_HEIGHT
+        )
+
+
+def spawn_meteor() -> Meteor:
+    """Erzeugt einen Meteor mit zufälliger (aber pro Runde fixer) Größe und Geschwindigkeit."""
+    radius = random.uniform(METEOR_MIN_RADIUS, METEOR_MAX_RADIUS)
+    speed = random.uniform(METEOR_MIN_SPEED, METEOR_MAX_SPEED)
+    edge = random.choice(("left", "right", "top", "bottom"))
+
+    if edge == "left":
+        x, y = -radius, random.uniform(0, WORLD_HEIGHT)
+        dx, dy = 1.0, random.uniform(-0.6, 0.6)
+    elif edge == "right":
+        x, y = WORLD_WIDTH + radius, random.uniform(0, WORLD_HEIGHT)
+        dx, dy = -1.0, random.uniform(-0.6, 0.6)
+    elif edge == "top":
+        x, y = random.uniform(0, WORLD_WIDTH), -radius
+        dx, dy = random.uniform(-0.6, 0.6), 1.0
+    else:
+        x, y = random.uniform(0, WORLD_WIDTH), WORLD_HEIGHT + radius
+        dx, dy = random.uniform(-0.6, 0.6), -1.0
+
+    length = math.hypot(dx, dy)
+    vx = dx / length * speed
+    vy = dy / length * speed
+
+    return Meteor(x, y, vx, vy, radius)
+
+
 class GameState:
     def __init__(self):
         self.pad_width = 100
@@ -65,6 +141,7 @@ class GameState:
         self.randomize_pad()
         self.lander = Lander(WORLD_WIDTH // 2, 100)
         self.flight_time = 0.0
+        self.meteor = spawn_meteor()
 
     def randomize_pad(self):
         self.pad_x_start = random.randint(0, WORLD_WIDTH - self.pad_width)
@@ -74,6 +151,7 @@ class GameState:
         self.randomize_pad()
         self.lander = Lander(WORLD_WIDTH // 2, 100)
         self.flight_time = 0.0
+        self.meteor = spawn_meteor()
 
     def set_inputs(self, main_thrust, rotate_right, rotate_left):
         lander = self.lander
@@ -94,6 +172,16 @@ class GameState:
             self.flight_time += dt
 
         lander.update(dt)
+
+        if lander.is_alive and not lander.has_landed:
+            self.meteor.update(dt)
+
+            dist = math.hypot(lander.x - self.meteor.x, lander.y - self.meteor.y)
+            if dist < self.meteor.radius + LANDER_COLLISION_RADIUS:
+                lander.is_alive = False
+
+            if self.meteor.is_off_screen():
+                self.meteor = spawn_meteor()
 
         if lander.y >= self.pad_y - 15:
             if self.pad_x_start <= lander.x <= self.pad_x_end:

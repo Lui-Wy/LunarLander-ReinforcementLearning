@@ -3,12 +3,16 @@ import random
 import numpy as np
 import pygame
 
-from game_logic import MAX_FUEL, GameState, WORLD_WIDTH, WORLD_HEIGHT
+from game_logic import MAX_FUEL, GameState, WORLD_WIDTH, WORLD_HEIGHT, METEOR_MAX_RADIUS, LANDER_COLLISION_RADIUS
 from HumanGame.rendering import draw_screen
 
 PHYSICS_FPS = 60
 PHYSICS_DT = 1.0 / PHYSICS_FPS
 VELOCITY_NORM = 300.0
+
+# Sicherheitsabstand zum Meteor, ab dem eine Annäherung bestraft wird
+METEOR_SAFE_MARGIN = 80.0
+METEOR_AVOIDANCE_WEIGHT = 4.0
 
 class LunarLanderEnv:
     def __init__(self, render_mode=False):
@@ -46,6 +50,7 @@ class LunarLanderEnv:
 
     def _get_observation(self):
         lander = self.game_state.lander
+        meteor = self.game_state.meteor
         pad_center_x = (self.game_state.pad_x_start + self.game_state.pad_x_end) / 2
 
         angle_norm = ((lander.angle + 180) % 360 - 180) / 180
@@ -58,7 +63,12 @@ class LunarLanderEnv:
             angle_norm,
             lander.fuel / MAX_FUEL,
             pad_center_x / WORLD_WIDTH,
-            (lander.x - pad_center_x) / WORLD_WIDTH
+            (lander.x - pad_center_x) / WORLD_WIDTH,
+            meteor.x / WORLD_WIDTH,
+            meteor.y / WORLD_HEIGHT,
+            meteor.vx / VELOCITY_NORM,
+            meteor.vy / VELOCITY_NORM,
+            meteor.radius / METEOR_MAX_RADIUS
         ], dtype=np.float32)
 
     def step(self, action):
@@ -116,6 +126,16 @@ class LunarLanderEnv:
         # vy ist positiv nach unten
         reward -= abs(lander.vy - target_vy) / 100.0
         reward -= angle_error * 1.0
+
+        # Abstand zum Meteor bestrafen, sobald er den Sicherheitsabstand unterschreitet
+        meteor = self.game_state.meteor
+        meteor_distance = math.hypot(lander.x - meteor.x, lander.y - meteor.y)
+        meteor_collision_distance = meteor.radius + LANDER_COLLISION_RADIUS
+        meteor_safe_distance = meteor_collision_distance + METEOR_SAFE_MARGIN
+
+        if meteor_distance < meteor_safe_distance:
+            danger = (meteor_safe_distance - meteor_distance) / METEOR_SAFE_MARGIN
+            reward -= danger * METEOR_AVOIDANCE_WEIGHT
 
         # nicht ewig fliegen / Treibstoff sparen
         reward -= 0.02

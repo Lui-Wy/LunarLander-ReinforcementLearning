@@ -8,6 +8,10 @@ BLACK = (0, 0, 0)
 GREEN = (0, 255, 0)
 RED = (255, 0, 0)
 YELLOW = (255, 255, 0)
+METEOR_COLOR = (170, 130, 90)
+METEOR_TRAIL_COLOR = (110, 85, 60)
+METEOR_STREAK_COLOR = (90, 65, 45)
+METEOR_STREAK_TIME_FACTOR = 0.5
 
 
 def get_viewport(screen: pygame.Surface) -> tuple[float, int, int]:
@@ -179,6 +183,102 @@ def draw_lander(screen: pygame.Surface, lander) -> None:
         pygame.draw.polygon(screen, YELLOW, rotated_flame)
 
 
+def get_streak_triangle(meteor, attach_offset: float, length_factor: float):
+    """
+    Berechnet die drei Eckpunkte eines Schweif-Dreiecks im Worldspace.
+
+    Beide Basispunkte liegen exakt auf dem Meteorrand (Abstand = Radius vom
+    Mittelpunkt), sodass keine Ecke seitlich über die Kugel hinausragt. Die
+    Spitze zeigt für alle Dreiecke exakt entgegen der Flugrichtung. Länge und
+    Basisbreite skalieren mit der Meteorgeschwindigkeit.
+
+    Args:
+        meteor: Meteor-Objekt mit Position, Geschwindigkeit und Radius.
+        attach_offset (float): Winkel-Offset des Ansatzpunkts auf dem Meteorrand in Grad.
+        length_factor (float): Individueller Längen-/Breitenfaktor dieses Dreiecks.
+
+    Returns:
+        tuple: Drei (x, y) Worldspace-Punkte des Dreiecks.
+    """
+    speed = math.hypot(meteor.vx, meteor.vy)
+    backward_angle = math.atan2(meteor.vy, meteor.vx) + math.pi
+    back_x, back_y = math.cos(backward_angle), math.sin(backward_angle)
+
+    # Ansatzpunkt darf um den Meteorrand herum variieren
+    attach_angle = backward_angle + math.radians(attach_offset)
+
+    # Beide Basisecken liegen exakt auf dem Kreisumfang, symmetrisch um den Ansatzwinkel
+    angular_half_width = math.radians(20.0 * length_factor)
+    base_angle_1 = attach_angle - angular_half_width
+    base_angle_2 = attach_angle + angular_half_width
+
+    base1 = (
+        meteor.x + math.cos(base_angle_1) * meteor.radius,
+        meteor.y + math.sin(base_angle_1) * meteor.radius
+    )
+    base2 = (
+        meteor.x + math.cos(base_angle_2) * meteor.radius,
+        meteor.y + math.sin(base_angle_2) * meteor.radius
+    )
+
+    length = max(8.0, speed * METEOR_STREAK_TIME_FACTOR * length_factor)
+    apex_base_x = meteor.x + math.cos(attach_angle) * meteor.radius
+    apex_base_y = meteor.y + math.sin(attach_angle) * meteor.radius
+
+    tip = (
+        apex_base_x + back_x * length,
+        apex_base_y + back_y * length
+    )
+
+    return base1, base2, tip
+
+
+def draw_meteor(screen: pygame.Surface, meteor) -> None:
+    """
+    Zeichnet den Meteor als Kugel mit Schweif-Dreiecken und einem ausblendenden
+    Staubstreifen, die Flugrichtung und Geschwindigkeit erkennbar machen.
+
+    Args:
+        screen (pygame.Surface): Oberfläche, auf die gezeichnet wird.
+        meteor: Meteor-Objekt mit Position, Radius und Bewegungsspur.
+
+    Returns:
+        None
+    """
+    for angle_offset, length_factor in meteor.streaks:
+        p1, p2, p3 = get_streak_triangle(meteor, angle_offset, length_factor)
+
+        pygame.draw.polygon(
+            screen,
+            METEOR_STREAK_COLOR,
+            [
+                world_to_screen(*p1, screen),
+                world_to_screen(*p2, screen),
+                world_to_screen(*p3, screen)
+            ]
+        )
+
+    trail_len = len(meteor.trail)
+
+    for i, (tx, ty) in enumerate(meteor.trail):
+        fade = (i + 1) / (trail_len + 1)
+        dot_radius = max(1, meteor.radius * fade * 0.5)
+
+        pygame.draw.circle(
+            screen,
+            METEOR_TRAIL_COLOR,
+            world_to_screen(tx, ty, screen),
+            scale_length(dot_radius, screen)
+        )
+
+    pygame.draw.circle(
+        screen,
+        METEOR_COLOR,
+        world_to_screen(meteor.x, meteor.y, screen),
+        scale_length(meteor.radius, screen)
+    )
+
+
 def draw_screen(screen, font, game_state):
     screen.fill(GREY)
 
@@ -205,6 +305,7 @@ def draw_screen(screen, font, game_state):
         scale_length(5, screen)
     )
 
+    draw_meteor(screen, game_state.meteor)
     draw_lander(screen, lander)
 
     color_vx = GREEN if abs(lander.vx) < 1.0 else RED

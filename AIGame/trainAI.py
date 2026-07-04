@@ -91,8 +91,8 @@ def main():
     env = LunarLanderEnv(render_mode=False)
     
     # Netzwerke initialisieren (Online-Netz und stabiles Target-Netz)
-    q_net = DQN(8, 4)
-    target_net = DQN(8, 4)
+    q_net = DQN(13, 4)
+    target_net = DQN(13, 4)
     target_net.load_state_dict(q_net.state_dict())
     
     optimizer = optim.Adam(q_net.parameters(), lr=LR)

@@ -4,11 +4,11 @@ import numpy as np
 import pygame
 import torch
 
-from game_logic import GameState, Lander, MAX_FUEL, WORLD_WIDTH, WORLD_HEIGHT
+from game_logic import GameState, Lander, Meteor, MAX_FUEL, WORLD_WIDTH, WORLD_HEIGHT, METEOR_MAX_RADIUS, spawn_meteor
 from HumanGame.rendering import draw_screen
 from AIGame.trainAI import DQN
 
-MODEL_PATH = "dataFromTraining_2.pth"
+MODEL_PATH = "dataFromTraining.pth"
 
 HEADER_HEIGHT = 40
 SCREEN_WIDTH = WORLD_WIDTH * 2
@@ -30,6 +30,7 @@ ORANGE = (255, 165, 0)
 
 def get_observation(game_state: GameState) -> np.ndarray:
     lander = game_state.lander
+    meteor = game_state.meteor
     pad_center_x = (game_state.pad_x_start + game_state.pad_x_end) / 2
 
     angle_norm = ((lander.angle + 180) % 360 - 180) / 180
@@ -42,7 +43,12 @@ def get_observation(game_state: GameState) -> np.ndarray:
         angle_norm,
         lander.fuel / MAX_FUEL,
         pad_center_x / WORLD_WIDTH,
-        (lander.x - pad_center_x) / WORLD_WIDTH
+        (lander.x - pad_center_x) / WORLD_WIDTH,
+        meteor.x / WORLD_WIDTH,
+        meteor.y / WORLD_HEIGHT,
+        meteor.vx / VELOCITY_NORM,
+        meteor.vy / VELOCITY_NORM,
+        meteor.radius / METEOR_MAX_RADIUS
     ], dtype=np.float32)
 
 
@@ -62,11 +68,39 @@ def reset_round(ai_state: GameState, human_state: GameState) -> None:
     pad_x_start = ai_state.pad_x_start
     pad_x_end = ai_state.pad_x_end
 
+    meteor_template = spawn_meteor()
+
     for state in (ai_state, human_state):
         state.pad_x_start = pad_x_start
         state.pad_x_end = pad_x_end
         state.lander = Lander(WORLD_WIDTH // 2, 100)
         state.flight_time = 0.0
+        state.meteor = Meteor(
+            meteor_template.x,
+            meteor_template.y,
+            meteor_template.vx,
+            meteor_template.vy,
+            meteor_template.radius
+        )
+
+
+def sync_meteor_respawn(ai_state: GameState, human_state: GameState, last_meteor_id: int) -> int:
+    """
+    Hält den Meteor auf beiden Seiten synchron, falls er (weil komplett vom
+    Bildschirm verschwunden) zwischenzeitlich neu gespawnt wurde. Die KI-Seite
+    dient dabei als Referenz, deren neuer Meteor auf die Mensch-Seite kopiert wird.
+    """
+    if id(ai_state.meteor) != last_meteor_id:
+        human_state.meteor = Meteor(
+            ai_state.meteor.x,
+            ai_state.meteor.y,
+            ai_state.meteor.vx,
+            ai_state.meteor.vy,
+            ai_state.meteor.radius
+        )
+        return id(ai_state.meteor)
+
+    return last_meteor_id
 
 
 def get_side_rects(screen: pygame.Surface) -> tuple[pygame.Rect, pygame.Rect]:
@@ -114,13 +148,14 @@ def main():
     font = pygame.font.SysFont(None, 24)
     header_font = pygame.font.SysFont(None, 28)
 
-    q_net = DQN(8, 4)
+    q_net = DQN(13, 4)
     q_net.load_state_dict(torch.load(MODEL_PATH))
     q_net.eval()
 
     ai_state = GameState()
     human_state = GameState()
     reset_round(ai_state, human_state)
+    last_meteor_id = id(ai_state.meteor)
 
     accumulator = 0.0
     ai_action = 0
@@ -148,6 +183,7 @@ def main():
 
         if keys[pygame.K_r] and round_over:
             reset_round(ai_state, human_state)
+            last_meteor_id = id(ai_state.meteor)
             round_over = False
 
         if not is_round_over(ai_state):
@@ -169,6 +205,7 @@ def main():
             if not round_over:
                 ai_state.update(PHYSICS_DT)
                 human_state.update(PHYSICS_DT)
+                last_meteor_id = sync_meteor_respawn(ai_state, human_state, last_meteor_id)
             accumulator -= PHYSICS_DT
 
         left_rect, right_rect = get_side_rects(screen)
