@@ -1,17 +1,27 @@
+# pygame-script
+# pygbag: width=1600, height=640, scale=dynamic
 import asyncio  # WICHTIG: Erlaubt dem Browser zu "atmen"
 import sys
 import numpy as np
 import pygame
 
-
 # Die Logik- und Grafik-Imports aus deinen Unterordnern
 from game_logic import GameState, Lander, Meteor, MAX_FUEL, WORLD_WIDTH, WORLD_HEIGHT, METEOR_MAX_RADIUS, spawn_meteor
 from rendering import draw_screen
 
-# Globale Konfigurationen
+# Globale Konfigurationen - FEST definiert für fehlerfreies Mobile-Rendering
 HEADER_HEIGHT = 40
-SCREEN_WIDTH = WORLD_WIDTH * 2
-SCREEN_HEIGHT = WORLD_HEIGHT + HEADER_HEIGHT
+INTERNAL_HEIGHT = 600 # Entspricht exakt der WORLD_HEIGHT
+
+# --- 1/4 zu 3/4 AUFTEILUNG ---
+# Gesamte virtuelle Breite bleibt 1600 (800 * 2)
+TOTAL_GAME_WIDTH = WORLD_WIDTH * 2 
+
+AI_WIDTH = TOTAL_GAME_WIDTH // 4      # 400 Pixel (1/4)
+HUMAN_WIDTH = (TOTAL_GAME_WIDTH // 4) * 3  # 1200 Pixel (3/4)
+
+SCREEN_WIDTH = TOTAL_GAME_WIDTH
+SCREEN_HEIGHT = INTERNAL_HEIGHT + HEADER_HEIGHT
 FPS = 60
 
 PHYSICS_FPS = 60
@@ -27,10 +37,8 @@ CYAN = (0, 200, 255)
 ORANGE = (255, 165, 0)
 
 
-# --- REINES NUMPY GEHIRN FÜR DEN BROWSER (OHNE TORCH) ---
 class NumPyDQN:
     def __init__(self):
-        # Lädt die dauerhaft gespeicherten .npy Dateien aus dem Hauptordner
         self.w0 = np.load("net_0_weight.npy")
         self.b0 = np.load("net_0_bias.npy")
         self.w2 = np.load("net_2_weight.npy")
@@ -42,13 +50,8 @@ class NumPyDQN:
         return np.maximum(0, x)
 
     def forward(self, x):
-        # Layer 1: Dot-Product (w0 * x) + Bias, danach ReLU
         x = self.relu(np.dot(self.w0, x) + self.b0)
-        
-        # Layer 2: Dot-Product (w2 * x) + Bias, danach ReLU
         x = self.relu(np.dot(self.w2, x) + self.b2)
-        
-        # Output Layer: Reines Dot-Product (w4 * x) + Bias (ohne Aktivierungsfunktion)
         q_values = np.dot(self.w4, x) + self.b4
         return q_values
 
@@ -77,7 +80,6 @@ def get_observation(game_state: GameState) -> np.ndarray:
     ], dtype=np.float32)
 
 
-# Nutzt jetzt die NumPyDQN-Klasse statt PyTorch-Tensoren
 def get_ai_action(model: NumPyDQN, game_state: GameState) -> int:
     observation = get_observation(game_state)
     q_values = model.forward(observation)
@@ -123,53 +125,30 @@ def sync_meteor_respawn(ai_state: GameState, human_state: GameState, last_meteor
     return last_meteor_id
 
 
-def get_side_rects(screen: pygame.Surface) -> tuple[pygame.Rect, pygame.Rect]:
-    width, height = screen.get_size()
-    game_height = max(1, height - HEADER_HEIGHT)
-    half_width = max(1, width // 2)
-
-    left_rect = pygame.Rect(0, HEADER_HEIGHT, half_width, game_height)
-    right_rect = pygame.Rect(half_width, HEADER_HEIGHT, max(1, width - half_width), game_height)
-
-    screen_rect = screen.get_rect()
-    return left_rect.clip(screen_rect), right_rect.clip(screen_rect)
-
-
-def draw_header(screen: pygame.Surface, font: pygame.font.Font, left_rect: pygame.Rect, right_rect: pygame.Rect) -> None:
-    pygame.draw.rect(screen, GREY, (0, 0, screen.get_width(), HEADER_HEIGHT))
+def draw_header(screen: pygame.Surface, font: pygame.font.Font) -> None:
+    pygame.draw.rect(screen, GREY, (0, 0, SCREEN_WIDTH, HEADER_HEIGHT))
 
     ai_label = font.render("KI", True, CYAN)
     human_label = font.render("MENSCH", True, ORANGE)
 
-    screen.blit(ai_label, ai_label.get_rect(center=(left_rect.centerx, HEADER_HEIGHT // 2)))
-    screen.blit(human_label, human_label.get_rect(center=(right_rect.centerx, HEADER_HEIGHT // 2)))
+    # Label zentrieren über den neuen asymmetrischen Breiten
+    screen.blit(ai_label, ai_label.get_rect(center=(AI_WIDTH // 2, HEADER_HEIGHT // 2)))
+    screen.blit(human_label, human_label.get_rect(center=(AI_WIDTH + (HUMAN_WIDTH // 2), HEADER_HEIGHT // 2)))
 
-    pygame.draw.line(screen, WHITE, (left_rect.width, 0), (left_rect.width, screen.get_height()), 2)
-
-
-def get_side_surface(cache: dict, key: str, size: tuple[int, int]) -> pygame.Surface:
-    surface = cache.get(key)
-    if surface is None or surface.get_size() != size:
-        surface = pygame.Surface(size)
-        cache[key] = surface
-    return surface
+    # Trennlinie an der neuen 1/4 Position zeichnen
+    pygame.draw.line(screen, WHITE, (AI_WIDTH, 0), (AI_WIDTH, SCREEN_HEIGHT), 2)
 
 
-# Hauptschleife als asynchrone Funktion deklariert
 async def main():
     pygame.init()
 
-    screen = pygame.display.set_mode(
-        (SCREEN_WIDTH, SCREEN_HEIGHT),
-        pygame.RESIZABLE
-    )
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Lunar Lander - AI vs Human")
 
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont(None, 24)
-    header_font = pygame.font.SysFont(None, 18)
+    font = pygame.font.Font(None, 24)
+    header_font = pygame.font.Font(None, 18)
 
-    # Initialisiere das leichtgewichtige NumPy-Netzwerk
     q_net = NumPyDQN()
 
     ai_state = GameState()
@@ -179,7 +158,10 @@ async def main():
 
     accumulator = 0.0
     ai_action = 0
-    side_surfaces = {}
+
+    # Hier erzeugen wir die Oberflächen direkt im neuen 1/4 zu 3/4 Verhältnis
+    left_surface = pygame.Surface((AI_WIDTH, INTERNAL_HEIGHT))
+    right_surface = pygame.Surface((HUMAN_WIDTH, INTERNAL_HEIGHT))
 
     running = True
     while running:
@@ -190,56 +172,44 @@ async def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.VIDEORESIZE:
-                if (event.w, event.h) != screen.get_size():
-                    screen = pygame.display.set_mode(
-                        (event.w, event.h),
-                        pygame.RESIZABLE
-                    )
 
         # --- HYBRIDE EINGABE-ABFRAGE (PC & MOBILE TOUCH) ---
         keys = pygame.key.get_pressed()
-        left_rect, right_rect = get_side_rects(screen)
         round_over = is_round_over(ai_state) and is_round_over(human_state)
         
-        # 1. PC Standard-Tastaturbelegung
         human_main_thrust = keys[pygame.K_UP] or keys[pygame.K_SPACE]
         human_rotate_left = keys[pygame.K_LEFT]
         human_rotate_right = keys[pygame.K_RIGHT]
         
-        # 2. Touch-Steuerung abfragen (falls der Bildschirm berührt/geklickt wird)
+        # Touch-Steuerung angepasst an das vergrößerte menschliche Fenster
         if pygame.mouse.get_pressed()[0]:
             touch_x, touch_y = pygame.mouse.get_pos()
             
-            # Überprüfen, ob im Header getippt wurde (um Runden neuzustarten)
             if round_over and touch_y <= HEADER_HEIGHT:
                 reset_round(ai_state, human_state)
                 last_meteor_id = id(ai_state.meteor)
                 round_over = False
             
-            # Überprüfen auf Berührungen in der menschlichen (rechten) Bildschirmhälfte
-            elif touch_x > right_rect.left and touch_y > HEADER_HEIGHT:
-                relative_x = touch_x - right_rect.left
-                zone_width = right_rect.width // 3
+            # Klicks zählen erst ab der KI-Grenze (AI_WIDTH)
+            elif touch_x > AI_WIDTH and touch_y > HEADER_HEIGHT:
+                relative_x = touch_x - AI_WIDTH
+                zone_width = HUMAN_WIDTH // 3  # Teilt den riesigen 3/4 Platz in 3 Steuerzonen
                 
                 if relative_x < zone_width:
-                    human_rotate_left = True     # Linkes Drittel der rechten Seite
+                    human_rotate_left = True     
                 elif relative_x > zone_width * 2:
-                    human_rotate_right = True    # Rechtes Drittel der rechten Seite
+                    human_rotate_right = True    
                 else:
-                    human_main_thrust = True     # Mittleres Drittel der rechten Seite
+                    human_main_thrust = True     
 
-        # Tastatur-Reset bei Rundenende
         if keys[pygame.K_r] and round_over:
             reset_round(ai_state, human_state)
             last_meteor_id = id(ai_state.meteor)
             round_over = False
 
-        # KI-Aktionen abrufen
         if not is_round_over(ai_state):
             ai_action = get_ai_action(q_net, ai_state)
 
-        # Inputs an die States übermitteln
         ai_state.set_inputs(
             main_thrust=ai_action == 1,
             rotate_right=ai_action == 2,
@@ -252,7 +222,6 @@ async def main():
             rotate_left=human_rotate_left
         )
 
-        # Physik-Updates
         while accumulator >= PHYSICS_DT:
             if not round_over:
                 ai_state.update(PHYSICS_DT)
@@ -260,30 +229,23 @@ async def main():
                 last_meteor_id = sync_meteor_respawn(ai_state, human_state, last_meteor_id)
             accumulator -= PHYSICS_DT
 
-        # Rendering vorbereiten
-        left_surface = get_side_surface(side_surfaces, "left", left_rect.size)
-        right_surface = get_side_surface(side_surfaces, "right", right_rect.size)
-
+        # Die rendering.py zieht die Grafik automatisch passend auf die neuen Breiten!
         draw_screen(left_surface, font, header_font, ai_state)
         draw_screen(right_surface, font, header_font, human_state)
 
         screen.fill(BLACK)
-        screen.blit(left_surface, left_rect.topleft)
-        screen.blit(right_surface, right_rect.topleft)
-        draw_header(screen, header_font, left_rect, right_rect)
+        screen.blit(left_surface, (0, HEADER_HEIGHT))
+        screen.blit(right_surface, (AI_WIDTH, HEADER_HEIGHT)) # Wird ab dem Ende des KI-Fensters gezeichnet
+        draw_header(screen, header_font)
 
         if round_over:
-            message = header_font.render("Beide Seiten fertig - R (PC) oder Header (Handy) für neue Runde", True, WHITE)
-            screen.blit(message, message.get_rect(center=(screen.get_width() // 2, HEADER_HEIGHT // 2)))
+            message = header_font.render("", True, WHITE)
+            screen.blit(message, message.get_rect(center=(SCREEN_WIDTH // 2, HEADER_HEIGHT // 2)))
 
         pygame.display.flip()
-        
-        # WICHTIG FÜR PYGBAG: Übergibt in jedem Frame kurz die Kontrolle an den Browser
         await asyncio.sleep(0)
 
     pygame.quit()
 
-
-# Startbefehl via asyncio
 if __name__ == "__main__":
     asyncio.run(main())
