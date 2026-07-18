@@ -109,19 +109,18 @@ def draw_controls(screen: pygame.Surface, font: pygame.font.Font, inputs: dict) 
     
     btn_w, btn_h = 180, 70
     margin = 20
-    spacing_y = 15
     
-    # Untere Reihe (Rotation)
+    # Unten in den Ecken
     bottom_y = height - btn_h - margin
-    # Obere Reihe (Schub)
-    top_y = bottom_y - btn_h - spacing_y
+    # Auf halber Höhe (zentriert bezüglich der Button-Höhe)
+    middle_y = (height - btn_h) // 2
     
-    # 4 Buttons definieren: (Text, X-Koordinate, Y-Koordinate, Leuchtet-Zustand)
+    # Layout-Definition mit neuer vertikaler Zentrierung für den Schub
     buttons = [
         ("LINKS", margin, bottom_y, inputs.get("left", False)),
-        ("SCHUB", margin, top_y, inputs.get("main", False)),
+        ("SCHUB", margin, middle_y, inputs.get("main", False)),
         ("RECHTS", width - btn_w - margin, bottom_y, inputs.get("right", False)),
-        ("SCHUB", width - btn_w - margin, top_y, inputs.get("main", False))
+        ("SCHUB", width - btn_w - margin, middle_y, inputs.get("main", False))
     ]
     
     for text, x, y, is_pressed in buttons:
@@ -160,7 +159,7 @@ def draw_screen(screen, font, header_font, game_state, current_inputs=None):
     
     screen.blit(font.render(f"Treibstoff: {int(lander.fuel)}", True, WHITE), (10, 10))
     screen.blit(font.render(f"H-Geschw.: {lander.vx:.1f}", True, color_vx), (10, 30))
-    screen.blit(font.render(f"V-Geschw.: {lander.vy:.1f}", True, color_vy), (10, 50))
+    screen.blit(font.render(f"V-Geschw. {lander.vy:.1f}", True, color_vy), (10, 50))
     screen.blit(font.render(f"Winkel: {int(lander.angle)}°", True, WHITE), (10, 70))
 
     if current_inputs is not None and lander.is_alive and not lander.has_landed:

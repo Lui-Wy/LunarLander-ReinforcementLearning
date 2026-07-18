@@ -33,20 +33,13 @@ ORANGE = (255, 165, 0)
 
 class NumPyDQN:
     def __init__(self):
-        try:
             self.w0 = np.load("net_0_weight.npy")
             self.b0 = np.load("net_0_bias.npy")
             self.w2 = np.load("net_2_weight.npy")
             self.b2 = np.load("net_2_bias.npy")
             self.w4 = np.load("net_4_weight.npy")
             self.b4 = np.load("net_4_bias.npy")
-        except Exception:
-            self.w0 = np.random.randn(64, 13).astype(np.float32) * 0.1
-            self.b0 = np.zeros((64,), dtype=np.float32)
-            self.w2 = np.random.randn(64, 64).astype(np.float32) * 0.1
-            self.b2 = np.zeros((64,), dtype=np.float32)
-            self.w4 = np.random.randn(4, 64).astype(np.float32) * 0.1
-            self.b4 = np.zeros((4,), dtype=np.float32)
+ 
 
     def relu(self, x):
         return np.maximum(0, x)
@@ -196,7 +189,7 @@ async def main():
         human_rotate_left = keys[pygame.K_LEFT]
         human_rotate_right = keys[pygame.K_RIGHT]
         
-        # Touch-/Maussteuerung für das getrennte Button-Layout im Human-Fenster
+        # Touch-Auswertung angepasst auf die zentrierten Schub-Buttons
         if pygame.mouse.get_pressed()[0] and not round_over:
             touch_x, touch_y = pygame.mouse.get_pos()
             if touch_x > DISPLAY_AI_WIDTH and touch_y > HEADER_HEIGHT:
@@ -205,15 +198,14 @@ async def main():
                 
                 btn_w, btn_h = 180, 70
                 margin = 20
-                spacing_y = 15
                 
                 bottom_y = INTERNAL_HEIGHT - btn_h - margin
-                top_y = bottom_y - btn_h - spacing_y
+                middle_y = (INTERNAL_HEIGHT - btn_h) // 2
                 
                 left_rect = pygame.Rect(margin, bottom_y, btn_w, btn_h)
-                shub_left_rect = pygame.Rect(margin, top_y, btn_w, btn_h)
+                shub_left_rect = pygame.Rect(margin, middle_y, btn_w, btn_h)
                 right_rect = pygame.Rect(DISPLAY_HUMAN_WIDTH - btn_w - margin, bottom_y, btn_w, btn_h)
-                shub_right_rect = pygame.Rect(DISPLAY_HUMAN_WIDTH - btn_w - margin, top_y, btn_w, btn_h)
+                shub_right_rect = pygame.Rect(DISPLAY_HUMAN_WIDTH - btn_w - margin, middle_y, btn_w, btn_h)
                 
                 if left_rect.collidepoint(local_x, local_y):
                     human_rotate_left = True
@@ -281,7 +273,7 @@ async def main():
             line1 = font.render("Game Over!", True, WHITE)
             line2 = font.render("Drücke R (PC) oder tippe hier für eine neue Runde", True, CYAN)
 
-            screen.blit(line1, line1.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3 )))
+            screen.blit(line1, line1.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3)))
             screen.blit(line2, line2.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3 + 30)))
 
         pygame.display.flip()
