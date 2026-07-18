@@ -33,12 +33,20 @@ ORANGE = (255, 165, 0)
 
 class NumPyDQN:
     def __init__(self):
-        self.w0 = np.load("net_0_weight.npy")
-        self.b0 = np.load("net_0_bias.npy")
-        self.w2 = np.load("net_2_weight.npy")
-        self.b2 = np.load("net_2_bias.npy")
-        self.w4 = np.load("net_4_weight.npy")
-        self.b4 = np.load("net_4_bias.npy")
+        try:
+            self.w0 = np.load("net_0_weight.npy")
+            self.b0 = np.load("net_0_bias.npy")
+            self.w2 = np.load("net_2_weight.npy")
+            self.b2 = np.load("net_2_bias.npy")
+            self.w4 = np.load("net_4_weight.npy")
+            self.b4 = np.load("net_4_bias.npy")
+        except Exception:
+            self.w0 = np.random.randn(64, 13).astype(np.float32) * 0.1
+            self.b0 = np.zeros((64,), dtype=np.float32)
+            self.w2 = np.random.randn(64, 64).astype(np.float32) * 0.1
+            self.b2 = np.zeros((64,), dtype=np.float32)
+            self.w4 = np.random.randn(4, 64).astype(np.float32) * 0.1
+            self.b4 = np.zeros((4,), dtype=np.float32)
 
     def relu(self, x):
         return np.maximum(0, x)
@@ -168,16 +176,17 @@ async def main():
             
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  
-                    touch_x, touch_y = event.pos
+                    touch_x, touch_y = pygame.mouse.get_pos()
+                    
                     if round_over:
                         box_width, box_height = 550, 100
-                        box_rect = pygame.Rect(
-                            (SCREEN_WIDTH - box_width) // 2, 
-                            (SCREEN_HEIGHT - box_height) // 2, 
-                            box_width, 
-                            box_height
-                        )
-                        if box_rect.collidepoint(touch_x, touch_y):
+                        box_x = (SCREEN_WIDTH - box_width) // 2
+                        box_y = (SCREEN_HEIGHT - box_height) // 3
+                        box_rect = pygame.Rect(box_x, box_y, box_width, box_height)
+                        
+                        hit_box = box_rect.inflate(40, 40)
+                        
+                        if hit_box.collidepoint(touch_x, touch_y):
                             reset_round(ai_state, human_state)
                             last_meteor_id = id(ai_state.meteor)
                             round_over = False
@@ -187,6 +196,7 @@ async def main():
         human_rotate_left = keys[pygame.K_LEFT]
         human_rotate_right = keys[pygame.K_RIGHT]
         
+        # Touch-/Maussteuerung für das getrennte Button-Layout im Human-Fenster
         if pygame.mouse.get_pressed()[0] and not round_over:
             touch_x, touch_y = pygame.mouse.get_pos()
             if touch_x > DISPLAY_AI_WIDTH and touch_y > HEADER_HEIGHT:
@@ -194,21 +204,23 @@ async def main():
                 local_y = touch_y - HEADER_HEIGHT
                 
                 btn_w, btn_h = 180, 70
-                spacing = 40
-                start_y = INTERNAL_HEIGHT - btn_h - 20
-                total_w = (btn_w * 3) + (spacing * 2)
-                start_x = (DISPLAY_HUMAN_WIDTH - total_w) // 2
+                margin = 20
+                spacing_y = 15
                 
-                left_rect = pygame.Rect(start_x, start_y, btn_w, btn_h)
-                main_rect = pygame.Rect(start_x + btn_w + spacing, start_y, btn_w, btn_h)
-                right_rect = pygame.Rect(start_x + (btn_w + spacing) * 2, start_y, btn_w, btn_h)
+                bottom_y = INTERNAL_HEIGHT - btn_h - margin
+                top_y = bottom_y - btn_h - spacing_y
+                
+                left_rect = pygame.Rect(margin, bottom_y, btn_w, btn_h)
+                shub_left_rect = pygame.Rect(margin, top_y, btn_w, btn_h)
+                right_rect = pygame.Rect(DISPLAY_HUMAN_WIDTH - btn_w - margin, bottom_y, btn_w, btn_h)
+                shub_right_rect = pygame.Rect(DISPLAY_HUMAN_WIDTH - btn_w - margin, top_y, btn_w, btn_h)
                 
                 if left_rect.collidepoint(local_x, local_y):
                     human_rotate_left = True
-                elif main_rect.collidepoint(local_x, local_y):
-                    human_main_thrust = True
                 elif right_rect.collidepoint(local_x, local_y):
                     human_rotate_right = True
+                elif shub_left_rect.collidepoint(local_x, local_y) or shub_right_rect.collidepoint(local_x, local_y):
+                    human_main_thrust = True
 
         if keys[pygame.K_r] and round_over:
             reset_round(ai_state, human_state)

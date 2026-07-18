@@ -108,20 +108,24 @@ def draw_controls(screen: pygame.Surface, font: pygame.font.Font, inputs: dict) 
     width, height = screen.get_size()
     
     btn_w, btn_h = 180, 70
-    spacing = 40
-    start_y = height - btn_h - 20
+    margin = 20
+    spacing_y = 15
     
-    total_w = (btn_w * 3) + (spacing * 2)
-    start_x = (width - total_w) // 2
+    # Untere Reihe (Rotation)
+    bottom_y = height - btn_h - margin
+    # Obere Reihe (Schub)
+    top_y = bottom_y - btn_h - spacing_y
     
+    # 4 Buttons definieren: (Text, X-Koordinate, Y-Koordinate, Leuchtet-Zustand)
     buttons = [
-        ("LINKS", start_x, inputs.get("left", False)),
-        ("SCHUB", start_x + btn_w + spacing, inputs.get("main", False)),
-        ("RECHTS", start_x + (btn_w + spacing) * 2, inputs.get("right", False))
+        ("LINKS", margin, bottom_y, inputs.get("left", False)),
+        ("SCHUB", margin, top_y, inputs.get("main", False)),
+        ("RECHTS", width - btn_w - margin, bottom_y, inputs.get("right", False)),
+        ("SCHUB", width - btn_w - margin, top_y, inputs.get("main", False))
     ]
     
-    for text, x, is_pressed in buttons:
-        rect = pygame.Rect(x, start_y, btn_w, btn_h)
+    for text, x, y, is_pressed in buttons:
+        rect = pygame.Rect(x, y, btn_w, btn_h)
         
         bg_color = (120, 120, 120, 160) if is_pressed else (50, 50, 50, 100)
         border_color = (255, 255, 255, 200) if is_pressed else (150, 150, 150, 120)
@@ -154,9 +158,9 @@ def draw_screen(screen, font, header_font, game_state, current_inputs=None):
 
     screen_width, screen_height = screen.get_size()
     
-    screen.blit(font.render(f"Treibstoff {int(lander.fuel)}", True, WHITE), (10, 10))
-    screen.blit(font.render(f"H-Geschw. {lander.vx:.1f}", True, color_vx), (10, 30))
-    screen.blit(font.render(f"V-Geschw.:  {lander.vy:.1f}", True, color_vy), (10, 50))
+    screen.blit(font.render(f"Treibstoff: {int(lander.fuel)}", True, WHITE), (10, 10))
+    screen.blit(font.render(f"H-Geschw.: {lander.vx:.1f}", True, color_vx), (10, 30))
+    screen.blit(font.render(f"V-Geschw.: {lander.vy:.1f}", True, color_vy), (10, 50))
     screen.blit(font.render(f"Winkel: {int(lander.angle)}°", True, WHITE), (10, 70))
 
     if current_inputs is not None and lander.is_alive and not lander.has_landed:
@@ -166,5 +170,5 @@ def draw_screen(screen, font, header_font, game_state, current_inputs=None):
         text_surf = header_font.render("CRASH!", True, RED)
         screen.blit(text_surf, text_surf.get_rect(center=(screen_width // 2, screen_height // 2)))
     elif lander.has_landed:
-        text_surf = header_font.render(f"SUCCESS! Zeit: {game_state.flight_time:.1f}s", True, GREEN)
+        text_surf = header_font.render(f"SUCCESS! {game_state.flight_time:.1f}s", True, GREEN)
         screen.blit(text_surf, text_surf.get_rect(center=(screen_width // 2, screen_height // 2)))
