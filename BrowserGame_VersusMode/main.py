@@ -5,15 +5,14 @@ import sys
 import numpy as np
 import pygame
 
-# Imports aus deinen Modulen
 from game_logic import GameState, Lander, Meteor, MAX_FUEL, WORLD_WIDTH, WORLD_HEIGHT, METEOR_MAX_RADIUS, spawn_meteor
 from rendering import draw_screen
 
-# NATIVE DISPLAY-METRIKEN (Gesamt: 1600 x 640)
+
 HEADER_HEIGHT = 40
 INTERNAL_HEIGHT = 600
 
-# --- 1/5 zu 4/5 AUFTEILUNG ---
+# 1/5 zu 4/5 AUFTEILUNG 
 DISPLAY_AI_WIDTH = 320      # 1600 // 5
 DISPLAY_HUMAN_WIDTH = 1280  # (1600 // 5) * 4
 
@@ -123,7 +122,7 @@ def sync_meteor_respawn(ai_state: GameState, human_state: GameState, last_meteor
 def draw_header(screen: pygame.Surface, font: pygame.font.Font) -> None:
     pygame.draw.rect(screen, GREY, (0, 0, SCREEN_WIDTH, HEADER_HEIGHT))
 
-    # Anti-Aliasing explizit aktiv für sauberen Text
+
     ai_label = font.render("KI", True, CYAN)
     human_label = font.render("MENSCH", True, ORANGE)
 
@@ -136,13 +135,13 @@ def draw_header(screen: pygame.Surface, font: pygame.font.Font) -> None:
 async def main():
     pygame.init()
 
-    # HWSURFACE und DOUBLEBUF verhindern Stauchungs-Artefakte im Browser
+
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.HWSURFACE | pygame.DOUBLEBUF)
     pygame.display.set_caption("Lunar Lander - AI vs Human (Asymmetric)")
 
     clock = pygame.time.Clock()
     
-    # Text-Auflösungen leicht erhöht für knackige Konturen
+
     font = pygame.font.Font(None, 26)
     header_font = pygame.font.Font(None, 24)
 
@@ -166,7 +165,7 @@ async def main():
             if event.type == pygame.QUIT:
                 running = False
 
-        # --- TASTENABFRAGE (PC) ---
+        # TASTENABFRAGE (PC) 
         keys = pygame.key.get_pressed()
         round_over = is_round_over(ai_state) and is_round_over(human_state)
         
@@ -174,11 +173,11 @@ async def main():
         human_rotate_left = keys[pygame.K_LEFT]
         human_rotate_right = keys[pygame.K_RIGHT]
         
-        # --- TOUCH- / MAUS-ABFRAGE (MOBILE OPTIMIERT) ---
+        #  TOUCH-MAUS-ABFRAGE
         if pygame.mouse.get_pressed()[0]:
             touch_x, touch_y = pygame.mouse.get_pos()
             
-            # Popup-Klick bei Rundenende abfangen
+         
             if round_over:
                 box_width, box_height = 550, 100
                 box_rect = pygame.Rect(
@@ -247,14 +246,11 @@ async def main():
         # Header rendern
         draw_header(screen, header_font)
 
-        # --- INTERAKTIVES POPUP BEI RUNDENENDE ---
+        # INTERAKTIVES POPUP BEI RUNDENENDE 
         if round_over:
-            # 1. Halbdurchsichtiger Abdunklungs-Layer
             popup_bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
             popup_bg.fill((0, 0, 0, 180))
-            screen.blit(popup_bg, (0, 0))
-
-            # 2. Popup-Box berechnen und zeichnen
+            screen.blit(popup_bg, (0, 0))           
             box_width, box_height = 550, 100
             box_rect = pygame.Rect(
                 (SCREEN_WIDTH - box_width) // 2, 
@@ -265,7 +261,6 @@ async def main():
             pygame.draw.rect(screen, GREY, box_rect, border_radius=10)
             pygame.draw.rect(screen, WHITE, box_rect, width=2, border_radius=10)
 
-            # 3. Zweizeiliger, geglätteter Text direkt auf den Hauptbildschirm
             line1 = font.render("Game Over!", True, WHITE)
             line2 = font.render("Drücke R (PC) oder tippe hier für eine neue Runde", True, CYAN)
 
