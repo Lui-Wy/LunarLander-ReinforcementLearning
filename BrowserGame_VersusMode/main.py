@@ -29,6 +29,7 @@ BLACK = (0, 0, 0)
 GREY = (60, 60, 60)
 CYAN = (0, 200, 255)
 ORANGE = (255, 165, 0)
+GRID_COLOR = (220, 60, 255)
 
 
 class NumPyDQN:
@@ -257,7 +258,7 @@ async def main():
 
         if round_over:
             popup_bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-            popup_bg.fill((0, 0, 0, 180))
+            popup_bg.fill((0, 0, 0, 120))
             screen.blit(popup_bg, (0, 0))
 
             box_width, box_height = 550, 100
@@ -268,9 +269,9 @@ async def main():
                 box_height
             )
             pygame.draw.rect(screen, GREY, box_rect, border_radius=10)
-            pygame.draw.rect(screen, WHITE, box_rect, width=2, border_radius=10)
+            pygame.draw.rect(screen, GRID_COLOR, box_rect, width=2, border_radius=10)
 
-            line1 = font.render("Game Over!", True, WHITE)
+            line1 = font.render("Game Over!", True, CYAN)
             line2 = font.render("Drücke R (PC) oder tippe hier für eine neue Runde", True, CYAN)
 
             screen.blit(line1, line1.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3)))
