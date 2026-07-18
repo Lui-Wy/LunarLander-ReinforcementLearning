@@ -44,7 +44,6 @@ def draw_lander(screen: pygame.Surface, lander) -> None:
 
     color = GREEN if lander.has_landed else (RED if not lander.is_alive else WHITE)
     
-
     line_thickness = max(2, scale_length(2.5, screen, True))
     pygame.draw.polygon(screen, color, rotated_points, line_thickness)
 
@@ -105,13 +104,45 @@ def draw_meteor(screen: pygame.Surface, meteor) -> None:
     pygame.draw.ellipse(screen, METEOR_COLOR, meteor_rect)
 
 
-def draw_screen(screen, font, header_font, game_state):
+def draw_controls(screen: pygame.Surface, font: pygame.font.Font, inputs: dict) -> None:
+    width, height = screen.get_size()
+    
+    btn_w, btn_h = 180, 70
+    spacing = 40
+    start_y = height - btn_h - 20
+    
+    total_w = (btn_w * 3) + (spacing * 2)
+    start_x = (width - total_w) // 2
+    
+    buttons = [
+        ("LINKS", start_x, inputs.get("left", False)),
+        ("SCHUB", start_x + btn_w + spacing, inputs.get("main", False)),
+        ("RECHTS", start_x + (btn_w + spacing) * 2, inputs.get("right", False))
+    ]
+    
+    for text, x, is_pressed in buttons:
+        rect = pygame.Rect(x, start_y, btn_w, btn_h)
+        
+        bg_color = (120, 120, 120, 160) if is_pressed else (50, 50, 50, 100)
+        border_color = (255, 255, 255, 200) if is_pressed else (150, 150, 150, 120)
+        
+        btn_surf = pygame.Surface((btn_w, btn_h), pygame.SRCALPHA)
+        pygame.draw.rect(btn_surf, bg_color, (0, 0, btn_w, btn_h), border_radius=8)
+        pygame.draw.rect(btn_surf, border_color, (0, 0, btn_w, btn_h), width=2, border_radius=8)
+        
+        txt_surf = font.render(text, True, WHITE)
+        txt_rect = txt_surf.get_rect(center=(btn_w // 2, btn_h // 2))
+        btn_surf.blit(txt_surf, txt_rect)
+        
+        screen.blit(btn_surf, rect)
+
+
+def draw_screen(screen, font, header_font, game_state, current_inputs=None):
     screen.fill(BLACK)
     
     pad_start = world_to_screen(game_state.pad_x_start, game_state.pad_y, screen)
     pad_end = world_to_screen(game_state.pad_x_end, game_state.pad_y, screen)
     
-
     pygame.draw.line(screen, GREEN, pad_start, pad_end, 5)
 
     draw_meteor(screen, game_state.meteor)
@@ -122,11 +153,14 @@ def draw_screen(screen, font, header_font, game_state):
     color_vy = GREEN if abs(lander.vy) < 1.5 else RED
 
     screen_width, screen_height = screen.get_size()
-
-    screen.blit(font.render(f"Treibstoff: {int(lander.fuel)}", True, WHITE), (10, 10))
-    screen.blit(font.render(f"H-Geschw.: {lander.vx:.1f}", True, color_vx), (10, 30))
-    screen.blit(font.render(f"V-Geschw.: {lander.vy:.1f}", True, color_vy), (10, 50))
+    
+    screen.blit(font.render(f"Treibstoff {int(lander.fuel)}", True, WHITE), (10, 10))
+    screen.blit(font.render(f"H-Geschw. {lander.vx:.1f}", True, color_vx), (10, 30))
+    screen.blit(font.render(f"V-Geschw.:  {lander.vy:.1f}", True, color_vy), (10, 50))
     screen.blit(font.render(f"Winkel: {int(lander.angle)}°", True, WHITE), (10, 70))
+
+    if current_inputs is not None and lander.is_alive and not lander.has_landed:
+        draw_controls(screen, font, current_inputs)
 
     if not lander.is_alive:
         text_surf = header_font.render("CRASH!", True, RED)

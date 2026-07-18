@@ -8,16 +8,14 @@ import pygame
 from game_logic import GameState, Lander, Meteor, MAX_FUEL, WORLD_WIDTH, WORLD_HEIGHT, METEOR_MAX_RADIUS, spawn_meteor
 from rendering import draw_screen
 
-
 HEADER_HEIGHT = 40
 INTERNAL_HEIGHT = 600
 
-# 1/5 zu 4/5 AUFTEILUNG 
-DISPLAY_AI_WIDTH = 320      # 1600 // 5
-DISPLAY_HUMAN_WIDTH = 1280  # (1600 // 5) * 4
+DISPLAY_AI_WIDTH = 320      
+DISPLAY_HUMAN_WIDTH = 1280  
 
-SCREEN_WIDTH = DISPLAY_AI_WIDTH + DISPLAY_HUMAN_WIDTH  # 1600
-SCREEN_HEIGHT = INTERNAL_HEIGHT + HEADER_HEIGHT         # 640
+SCREEN_WIDTH = DISPLAY_AI_WIDTH + DISPLAY_HUMAN_WIDTH  
+SCREEN_HEIGHT = INTERNAL_HEIGHT + HEADER_HEIGHT         
 FPS = 60
 
 PHYSICS_FPS = 60
@@ -122,7 +120,6 @@ def sync_meteor_respawn(ai_state: GameState, human_state: GameState, last_meteor
 def draw_header(screen: pygame.Surface, font: pygame.font.Font) -> None:
     pygame.draw.rect(screen, GREY, (0, 0, SCREEN_WIDTH, HEADER_HEIGHT))
 
-
     ai_label = font.render("KI", True, CYAN)
     human_label = font.render("MENSCH", True, ORANGE)
 
@@ -134,19 +131,21 @@ def draw_header(screen: pygame.Surface, font: pygame.font.Font) -> None:
 
 async def main():
     pygame.init()
-
+    pygame.font.init()
 
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.HWSURFACE | pygame.DOUBLEBUF)
-    pygame.display.set_caption("Lunar Lander - AI vs Human (Asymmetric)")
+    pygame.display.set_caption("Lunar Lander - AI vs Human")
 
     clock = pygame.time.Clock()
     
-
-    font = pygame.font.Font(None, 26)
-    header_font = pygame.font.Font(None, 24)
+    try:
+        font = pygame.font.SysFont("Arial", 20)
+        header_font = pygame.font.SysFont("Arial", 24)
+    except Exception:
+        font = pygame.font.Font(None, 26)
+        header_font = pygame.font.Font(None, 24)
 
     q_net = NumPyDQN()
-
     ai_state = GameState()
     human_state = GameState()
     reset_round(ai_state, human_state)
@@ -161,47 +160,55 @@ async def main():
         frame_time = min(frame_time, MAX_FRAME_TIME)
         accumulator += frame_time
 
+        round_over = is_round_over(ai_state) and is_round_over(human_state)
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  
+                    touch_x, touch_y = event.pos
+                    if round_over:
+                        box_width, box_height = 550, 100
+                        box_rect = pygame.Rect(
+                            (SCREEN_WIDTH - box_width) // 2, 
+                            (SCREEN_HEIGHT - box_height) // 2, 
+                            box_width, 
+                            box_height
+                        )
+                        if box_rect.collidepoint(touch_x, touch_y):
+                            reset_round(ai_state, human_state)
+                            last_meteor_id = id(ai_state.meteor)
+                            round_over = False
 
-        # TASTENABFRAGE (PC) 
         keys = pygame.key.get_pressed()
-        round_over = is_round_over(ai_state) and is_round_over(human_state)
-        
         human_main_thrust = keys[pygame.K_UP] or keys[pygame.K_SPACE]
         human_rotate_left = keys[pygame.K_LEFT]
         human_rotate_right = keys[pygame.K_RIGHT]
         
-        #  TOUCH-MAUS-ABFRAGE
-        if pygame.mouse.get_pressed()[0]:
+        if pygame.mouse.get_pressed()[0] and not round_over:
             touch_x, touch_y = pygame.mouse.get_pos()
-            
-         
-            if round_over:
-                box_width, box_height = 550, 100
-                box_rect = pygame.Rect(
-                    (SCREEN_WIDTH - box_width) // 2, 
-                    (SCREEN_HEIGHT - box_height) // 2, 
-                    box_width, 
-                    box_height
-                )
-                if box_rect.collidepoint(touch_x, touch_y):
-                    reset_round(ai_state, human_state)
-                    last_meteor_id = id(ai_state.meteor)
-                    round_over = False
-            
-            # Touch-Steuerung im laufenden Spiel (Mensch-Bereich)
-            elif touch_x > DISPLAY_AI_WIDTH and touch_y > HEADER_HEIGHT:
-                relative_x = touch_x - DISPLAY_AI_WIDTH
-                zone_width = DISPLAY_HUMAN_WIDTH // 3
+            if touch_x > DISPLAY_AI_WIDTH and touch_y > HEADER_HEIGHT:
+                local_x = touch_x - DISPLAY_AI_WIDTH
+                local_y = touch_y - HEADER_HEIGHT
                 
-                if relative_x < zone_width:
+                btn_w, btn_h = 180, 70
+                spacing = 40
+                start_y = INTERNAL_HEIGHT - btn_h - 20
+                total_w = (btn_w * 3) + (spacing * 2)
+                start_x = (DISPLAY_HUMAN_WIDTH - total_w) // 2
+                
+                left_rect = pygame.Rect(start_x, start_y, btn_w, btn_h)
+                main_rect = pygame.Rect(start_x + btn_w + spacing, start_y, btn_w, btn_h)
+                right_rect = pygame.Rect(start_x + (btn_w + spacing) * 2, start_y, btn_w, btn_h)
+                
+                if left_rect.collidepoint(local_x, local_y):
                     human_rotate_left = True
-                elif relative_x > zone_width * 2:
-                    human_rotate_right = True
-                else:
+                elif main_rect.collidepoint(local_x, local_y):
                     human_main_thrust = True
+                elif right_rect.collidepoint(local_x, local_y):
+                    human_rotate_right = True
 
         if keys[pygame.K_r] and round_over:
             reset_round(ai_state, human_state)
@@ -223,7 +230,6 @@ async def main():
             rotate_left=human_rotate_left
         )
 
-        # Physik-Updates
         while accumulator >= PHYSICS_DT:
             if not round_over:
                 ai_state.update(PHYSICS_DT)
@@ -231,26 +237,25 @@ async def main():
                 last_meteor_id = sync_meteor_respawn(ai_state, human_state, last_meteor_id)
             accumulator -= PHYSICS_DT
 
-        # --- NATIVES VEKTOR-RENDERING (SAUBERE OBERFLÄCHEN) ---
         left_surface = pygame.Surface((DISPLAY_AI_WIDTH, INTERNAL_HEIGHT), pygame.SRCALPHA)
         right_surface = pygame.Surface((DISPLAY_HUMAN_WIDTH, INTERNAL_HEIGHT), pygame.SRCALPHA)
 
-        draw_screen(left_surface, font, header_font, ai_state)
-        draw_screen(right_surface, font, header_font, human_state)
+        draw_screen(left_surface, font, header_font, ai_state, current_inputs=None)
+        
+        human_inputs = {"left": human_rotate_left, "main": human_main_thrust, "right": human_rotate_right}
+        draw_screen(right_surface, font, header_font, human_state, current_inputs=human_inputs)
 
-        # Zusammenfügen auf dem Screen
         screen.fill(BLACK)
         screen.blit(left_surface, (0, HEADER_HEIGHT))
         screen.blit(right_surface, (DISPLAY_AI_WIDTH, HEADER_HEIGHT))
         
-        # Header rendern
         draw_header(screen, header_font)
 
-        # INTERAKTIVES POPUP BEI RUNDENENDE 
         if round_over:
             popup_bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
             popup_bg.fill((0, 0, 0, 180))
-            screen.blit(popup_bg, (0, 0))           
+            screen.blit(popup_bg, (0, 0))
+
             box_width, box_height = 550, 100
             box_rect = pygame.Rect(
                 (SCREEN_WIDTH - box_width) // 2, 
@@ -264,11 +269,8 @@ async def main():
             line1 = font.render("Game Over!", True, WHITE)
             line2 = font.render("Drücke R (PC) oder tippe hier für eine neue Runde", True, CYAN)
 
-            r1 = line1.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3 ))
-            r2 = line2.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3 + 30))
-
-            screen.blit(line1, r1)
-            screen.blit(line2, r2)
+            screen.blit(line1, line1.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3 )))
+            screen.blit(line2, line2.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3 + 30)))
 
         pygame.display.flip()
         await asyncio.sleep(0)
