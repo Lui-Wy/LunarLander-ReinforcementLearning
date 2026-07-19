@@ -197,7 +197,7 @@ async def main():
                 local_x = touch_x - DISPLAY_AI_WIDTH
                 local_y = touch_y - HEADER_HEIGHT
                 
-                btn_w, btn_h = 180, 70
+                btn_w, btn_h = 180, 175
                 margin = 20
                 
                 bottom_y = INTERNAL_HEIGHT - btn_h - margin

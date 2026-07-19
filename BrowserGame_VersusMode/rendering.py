@@ -3,7 +3,7 @@ import math
 import random
 from game_logic import WORLD_WIDTH, WORLD_HEIGHT
 
-# Farbpalette exakt nach der Synthwave-Vorlage
+
 SKY_TOP = (15, 0, 35)         
 SKY_MID = (50, 0, 60)        
 SKY_BOT = (130, 0, 80)       
@@ -17,14 +17,14 @@ RED = (255, 40, 80)
 GREEN = (0, 240, 160)        
 WINDOW_BLUE = (0, 230, 255)
 
-# Meteor-Farben
+
 METEOR_COLOR = (90, 95, 110)
 METEOR_CRATER_COLOR = (60, 65, 75)
 METEOR_TRAIL_COLOR = (80, 0, 140)     
 METEOR_STREAK_RGB = (0, 140, 200)     
 METEOR_STREAK_TIME_FACTOR = 0.4
 
-# Persistente Weltraum- und Bergdaten
+
 MOUNTAIN_TRIANGLES = []
 STARS = []
 
@@ -35,10 +35,10 @@ def get_viewport(screen: pygame.Surface) -> tuple[float, float, int, int]:
     """
     screen_w, screen_h = screen.get_size()
     
-    # Einheitlichen Skalierungsfaktor wählen (verhindert Verzerrung)
+  
     scale = min(screen_w / WORLD_WIDTH, screen_h / WORLD_HEIGHT)
     
-    # Offsets für die Zentrierung berechnen
+  
     offset_x = int((screen_w - (WORLD_WIDTH * scale)) / 2)
     offset_y = int((screen_h - (WORLD_HEIGHT * scale)) / 2)
     
@@ -87,7 +87,7 @@ def draw_retro_sky(screen: pygame.Surface):
     width, height = screen.get_size()
     horizon_px = world_to_screen(0, WORLD_HEIGHT * 0.62, screen)[1]
     
-    # Himmel-Verlauf (angepasst an den Viewport)
+
     for y in range(max(0, offset_y), horizon_px):
         t = (y - offset_y) / (horizon_px - offset_y) if (horizon_px - offset_y) > 0 else 0
         t = max(0.0, min(1.0, t))
@@ -175,16 +175,16 @@ def draw_retro_grid(screen: pygame.Surface):
     horizon_px = world_to_screen(0, WORLD_HEIGHT * 0.62, screen)[1]
     bottom_px = world_to_screen(0, WORLD_HEIGHT, screen)[1]
     
-    # Hintergrund-Auffüllung außerhalb des verzerren-gesicherten Grids
+
     pygame.draw.rect(screen, BLACK, (0, horizon_px, width, height - horizon_px))
     
-    # Horizontales Glühen
+
     glow_surf = pygame.Surface((width, 6), pygame.SRCALPHA)
     pygame.draw.rect(glow_surf, (*GRID_COLOR, 80), (0, 0, width, 2))
     pygame.draw.rect(glow_surf, (*GRID_COLOR, 40), (0, 2, width, 4))
     screen.blit(glow_surf, (0, horizon_px - 3))
     
-    # 1. Horizontale Linien (Projektion)
+   
     num_horiz = 14
     grid_height = bottom_px - horizon_px
     for i in range(num_horiz):
@@ -192,7 +192,7 @@ def draw_retro_grid(screen: pygame.Surface):
         y = horizon_px + int(grid_height * t)
         pygame.draw.line(screen, GRID_COLOR, (0, y), (width, y), 1)
         
-    # 2. Vertikale Gitterlinien (Fluchtpunkt liegt exakt mittig am Fuß der Berge)
+    
     num_vert = 26
     flucht_x, flucht_y = world_to_screen(WORLD_WIDTH / 2, WORLD_HEIGHT * 0.62, screen)
     
@@ -218,10 +218,8 @@ def draw_lander(screen: pygame.Surface, lander) -> None:
     def transform_points(pts):
         transformed = []
         for px, py in pts:
-            # Rotation korrekt berechnen
             rx = px * cos_a - py * sin_a
             ry = px * sin_a + py * cos_a
-            # FIX: Jetzt wird ry statt py benutzt, damit das Schiff beim Drehen stabil bleibt
             scr_x = int((lander.x + rx) * scale + offset_x)
             scr_y = int((lander.y + ry) * scale + offset_y)
             transformed.append((scr_x, scr_y))
@@ -331,7 +329,6 @@ def draw_landing_pad(screen: pygame.Surface, game_state) -> None:
 
 def draw_controls(screen: pygame.Surface, font: pygame.font.Font, inputs: dict) -> None:
     width, height = screen.get_size()
-    # ANPASSUNG: Höhe von 70 auf 175 erhöht (2,5x größer) für barrierefreies Drücken
     btn_w, btn_h = 180, 175
     margin = 20
     bottom_y = height - btn_h - margin
@@ -360,8 +357,6 @@ def draw_controls(screen: pygame.Surface, font: pygame.font.Font, inputs: dict) 
 
 def draw_screen(screen, font, header_font, game_state, current_inputs=None):
     init_background_data()
-    
-    # Bildschirmhintergrund leeren, um Ränder bei zentriertem Viewport sauber zu halten
     screen.fill(BLACK)
     
     draw_retro_sky(screen)
