@@ -3,13 +3,13 @@ import math
 import random
 from game_logic import WORLD_WIDTH, WORLD_HEIGHT
 
-# Farbpalette exakt nach der neuen Synthwave-Vorlage
-SKY_TOP = (15, 0, 35)         # Dunkles Violett ganz oben
-SKY_MID = (50, 0, 60)        # Satteres Lila in der Mitte
-SKY_BOT = (130, 0, 80)       # Magentafarbener Horizontleuchten
+# Farbpalette exakt nach der Synthwave-Vorlage
+SKY_TOP = (15, 0, 35)         
+SKY_MID = (50, 0, 60)        
+SKY_BOT = (130, 0, 80)       
 
-GRID_COLOR = (220, 60, 255)   # Knalliges Neon-Magenta/Violett für das Raster und die Bergkanten
-MOUNTAIN_DARK = (20, 15, 45)   # Dunkles Indigo/Violett für die Bergflächen
+GRID_COLOR = (220, 60, 255)   
+MOUNTAIN_DARK = (20, 15, 45)   
 
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -28,33 +28,51 @@ METEOR_STREAK_TIME_FACTOR = 0.4
 MOUNTAIN_TRIANGLES = []
 STARS = []
 
+def get_viewport(screen: pygame.Surface) -> tuple[float, float, int, int]:
+    """
+    Berechnet eine einheitliche Skalierung, um Verzerrungen zu vermeiden (Aspect Ratio Lock).
+    Zentriert das Spielfeld, falls das Fenster-Seitenverhältnis nicht übereinstimmt.
+    """
+    screen_w, screen_h = screen.get_size()
+    
+    # Einheitlichen Skalierungsfaktor wählen (verhindert Verzerrung)
+    scale = min(screen_w / WORLD_WIDTH, screen_h / WORLD_HEIGHT)
+    
+    # Offsets für die Zentrierung berechnen
+    offset_x = int((screen_w - (WORLD_WIDTH * scale)) / 2)
+    offset_y = int((screen_h - (WORLD_HEIGHT * scale)) / 2)
+    
+    return scale, scale, offset_x, offset_y
+
+def world_to_screen(x: float, y: float, screen: pygame.Surface) -> tuple[int, int]:
+    scale_x, scale_y, offset_x, offset_y = get_viewport(screen)
+    return int(x * scale_x + offset_x), int(y * scale_y + offset_y)
+
+def scale_length(value: float, screen: pygame.Surface, horizontal: bool = True) -> int:
+    scale_x, _, _, _ = get_viewport(screen)
+    return max(1, int(value * scale_x))
+
 def init_background_data():
     global MOUNTAIN_TRIANGLES, STARS
-    # 1. Berge als überlappende Dreiecke (Pyramiden) generieren
     if not MOUNTAIN_TRIANGLES:
-        random.seed(999) # Fester Seed für stabiles Layout
+        random.seed(999) 
         num_mountains = 16
         horizon_y = WORLD_HEIGHT * 0.62
         
-        # Wir generieren Berge in zwei Reihen (Hintergrund kleiner, Vordergrund größer)
-        # Hintergrund-Berge
         for _ in range(num_mountains // 2):
             peak_x = random.uniform(0, WORLD_WIDTH)
             base_w = random.uniform(80, 150)
             height = random.uniform(40, 75)
-            MOUNTAIN_TRIANGLES.append((peak_x, horizon_y - height, base_w, 0)) # Layer 0: hinten
+            MOUNTAIN_TRIANGLES.append((peak_x, horizon_y - height, base_w, 0))
             
-        # Vordergrund-Berge
         for _ in range(num_mountains // 2):
             peak_x = random.uniform(0, WORLD_WIDTH)
             base_w = random.uniform(120, 220)
             height = random.uniform(60, 105)
-            MOUNTAIN_TRIANGLES.append((peak_x, horizon_y - height, base_w, 1)) # Layer 1: vorne
+            MOUNTAIN_TRIANGLES.append((peak_x, horizon_y - height, base_w, 1))
             
-        # Sortieren, damit die hinteren zuerst gezeichnet werden
         MOUNTAIN_TRIANGLES.sort(key=lambda m: m[3])
             
-    # 2. Sternenhimmel generieren
     if not STARS:
         random.seed(42)
         for _ in range(100):
@@ -65,12 +83,14 @@ def init_background_data():
             STARS.append((sx, sy, size, brightness))
 
 def draw_retro_sky(screen: pygame.Surface):
+    _, _, _, offset_y = get_viewport(screen)
     width, height = screen.get_size()
-    horizon_y = int(height * 0.62)
+    horizon_px = world_to_screen(0, WORLD_HEIGHT * 0.62, screen)[1]
     
-    # Weicher Himmel-Verlauf
-    for y in range(horizon_y):
-        t = y / horizon_y
+    # Himmel-Verlauf (angepasst an den Viewport)
+    for y in range(max(0, offset_y), horizon_px):
+        t = (y - offset_y) / (horizon_px - offset_y) if (horizon_px - offset_y) > 0 else 0
+        t = max(0.0, min(1.0, t))
         if t < 0.5:
             factor = t / 0.5
             r = int(SKY_TOP[0] + (SKY_MID[0] - SKY_TOP[0]) * factor)
@@ -84,14 +104,10 @@ def draw_retro_sky(screen: pygame.Surface):
             
         pygame.draw.line(screen, (r, g, b), (0, y), (width, y))
         
-    # Sterne
     time_tick = pygame.time.get_ticks() * 0.002
-    scale_x = width / WORLD_WIDTH
-    scale_y = height / WORLD_HEIGHT
     
     for sx, sy, size, base_bright in STARS:
-        cx = int(sx * scale_x)
-        cy = int(sy * scale_y)
+        cx, cy = world_to_screen(sx, sy, screen)
         twinkle = int(base_bright * (0.7 + 0.3 * math.sin(time_tick + sx)))
         twinkle = max(0, min(255, twinkle))
         
@@ -101,115 +117,93 @@ def draw_retro_sky(screen: pygame.Surface):
             pygame.draw.rect(screen, (twinkle, twinkle, twinkle), (cx, cy, size, size))
 
 def draw_retro_sun(screen: pygame.Surface):
-    width, height = screen.get_size()
-    horizon_y = int(height * 0.62)
+    sun_radius = scale_length(WORLD_HEIGHT * 0.22, screen)
+    sun_cx, sun_cy = world_to_screen(WORLD_WIDTH / 2, WORLD_HEIGHT * 0.62 - (WORLD_HEIGHT * 0.22 * 0.3), screen)
+    horizon_px = world_to_screen(0, WORLD_HEIGHT * 0.62, screen)[1]
     
-    # Dimensionen der Sonne basierend auf Bildschirmgröße
-    sun_radius = int(height * 0.22)
-    sun_cx = width // 2
-    sun_cy = int(horizon_y - sun_radius * 0.3) # Leicht versunken am Horizont
-    
-    # Eine separate Surface für die Sonne mit Alpha-Kanal erstellen
+    if sun_radius <= 0:
+        return
+        
     sun_surf = pygame.Surface((sun_radius * 2, sun_radius * 2), pygame.SRCALPHA)
     
-    # Sonne vertikal von Gelb (oben) nach Pink/Magenta (unten) verlaufen lassen
     for sy in range(sun_radius * 2):
-        # Berechnen, ob wir uns innerhalb des Kreises befinden (Kreisgleichung)
         dy = sy - sun_radius
         dx_max = math.sqrt(max(0, sun_radius**2 - dy**2))
         
         if dx_max > 0:
-            # Farb-Interpolation Gelb -> Pink
             t_color = sy / (sun_radius * 2)
-            r = int(255)
+            r = 255
             g = int(240 * (1.0 - t_color) + 40 * t_color)
             b = int(100 * (1.0 - t_color) + 150 * t_color)
             
-            # Das typische Synthwave-Linienraster (unten dickere Lücken als oben)
-            # Wir prüfen die absolute Y-Position im globalen Screen-Space für Konsistenz
             global_y = sun_cy - sun_radius + sy
-            if global_y > horizon_y - sun_radius * 0.8:
-                # Modulo-Lücken-Effekt, der nach unten hin breiter wird
-                dist_to_bottom = global_y - (horizon_y - sun_radius * 0.8)
-                bar_cycle = 14 + int(dist_to_bottom * 0.25) # Wachsende Lückenbreite
+            if global_y > horizon_px - sun_radius * 0.8:
+                dist_to_bottom = global_y - (horizon_px - sun_radius * 0.8)
+                bar_cycle = 14 + int(dist_to_bottom * 0.25)
                 if (global_y % bar_cycle) < (bar_cycle * 0.35):
-                    continue # Überspringen = Loch/Linie reinschneiden
+                    continue
             
-            # Zeichne die horizontale Linie in der Sonne
             start_x = int(sun_radius - dx_max)
             end_x = int(sun_radius + dx_max)
             pygame.draw.line(sun_surf, (r, g, b), (start_x, sy), (end_x, sy))
             
-    # Sonne auf den Screen blitten
     screen.blit(sun_surf, (sun_cx - sun_radius, sun_cy - sun_radius))
 
 def draw_retro_mountains(screen: pygame.Surface):
     init_background_data()
-    width, height = screen.get_size()
-    horizon_y = int(height * 0.62)
-    
-    scale_x = width / WORLD_WIDTH
-    scale_y = height / WORLD_HEIGHT
+    horizon_px = world_to_screen(0, WORLD_HEIGHT * 0.62, screen)[1]
+    scale, _, _, _ = get_viewport(screen)
     
     for peak_x, peak_y, base_w, _ in MOUNTAIN_TRIANGLES:
-        # Koordinaten für das Dreieck berechnen
-        cx = peak_x * scale_x
-        cy = peak_y * scale_y
-        half_w = (base_w * scale_x) / 2
+        cx, cy = world_to_screen(peak_x, peak_y, screen)
+        half_w = (base_w * scale) / 2
         
-        p1 = (cx, cy)                  # Spitze des Berges
-        p2 = (cx - half_w, horizon_y)  # Links unten am Fuß
-        p3 = (cx + half_w, horizon_y)  # Rechts unten am Fuß
+        p1 = (cx, cy)                  
+        p2 = (cx - half_w, horizon_px)  
+        p3 = (cx + half_w, horizon_px)  
         
-        # 1. Bergfläche füllen (Dunkles Violett deckt die Sonne ab)
         pygame.draw.polygon(screen, MOUNTAIN_DARK, [p1, p2, p3])
         
-        # 2. Leuchtende Umrandung (Die beiden Schenkel des Dreiecks) in Gitterfarbe
-        lw = max(1, int(2 * scale_x))
+        lw = max(1, int(2 * scale))
         pygame.draw.line(screen, GRID_COLOR, p1, p2, lw)
         pygame.draw.line(screen, GRID_COLOR, p1, p3, lw)
 
 def draw_retro_grid(screen: pygame.Surface):
+    scale, _, offset_x, offset_y = get_viewport(screen)
     width, height = screen.get_size()
-    horizon_y = int(height * 0.62)
     
-    # Bodenfarbe: Tiefschwarz
-    pygame.draw.rect(screen, BLACK, (0, horizon_y, width, height - horizon_y))
+    horizon_px = world_to_screen(0, WORLD_HEIGHT * 0.62, screen)[1]
+    bottom_px = world_to_screen(0, WORLD_HEIGHT, screen)[1]
     
-    # Ein leichtes horizontales Glühen direkt am Horizont zeichnen
+    # Hintergrund-Auffüllung außerhalb des verzerren-gesicherten Grids
+    pygame.draw.rect(screen, BLACK, (0, horizon_px, width, height - horizon_px))
+    
+    # Horizontales Glühen
     glow_surf = pygame.Surface((width, 6), pygame.SRCALPHA)
     pygame.draw.rect(glow_surf, (*GRID_COLOR, 80), (0, 0, width, 2))
     pygame.draw.rect(glow_surf, (*GRID_COLOR, 40), (0, 2, width, 4))
-    screen.blit(glow_surf, (0, horizon_y - 3))
+    screen.blit(glow_surf, (0, horizon_px - 3))
     
-    # 1. Horizontale Linien (Neon-Violett)
+    # 1. Horizontale Linien (Projektion)
     num_horiz = 14
+    grid_height = bottom_px - horizon_px
     for i in range(num_horiz):
         t = (i / (num_horiz - 1)) ** 2.5
-        y = horizon_y + int((height - horizon_y) * t)
+        y = horizon_px + int(grid_height * t)
         pygame.draw.line(screen, GRID_COLOR, (0, y), (width, y), 1)
         
-    # 2. Vertikale Gitterlinien fluchtend zum Horizont (Fuß der Berge)
+    # 2. Vertikale Gitterlinien (Fluchtpunkt liegt exakt mittig am Fuß der Berge)
     num_vert = 26
-    flucht_x = width // 2
-    flucht_y = horizon_y 
+    flucht_x, flucht_y = world_to_screen(WORLD_WIDTH / 2, WORLD_HEIGHT * 0.62, screen)
+    
+    grid_width_world = WORLD_WIDTH * 2.4
+    world_start_x = -WORLD_WIDTH * 0.7
     
     for i in range(num_vert):
-        x_bottom = int((i / (num_vert - 1)) * width * 2.4 - (width * 0.7))
-        pygame.draw.line(screen, GRID_COLOR, (flucht_x, flucht_y), (x_bottom, height), 1)
-
-def get_viewport(screen: pygame.Surface) -> tuple[float, float, int, int]:
-    scale_x = screen.get_width() / WORLD_WIDTH
-    scale_y = screen.get_height() / WORLD_HEIGHT
-    return scale_x, scale_y, 0, 0
-
-def world_to_screen(x: float, y: float, screen: pygame.Surface) -> tuple[int, int]:
-    scale_x, scale_y, _, _ = get_viewport(screen)
-    return int(x * scale_x), int(y * scale_y)
-
-def scale_length(value: float, screen: pygame.Surface, horizontal: bool = True) -> int:
-    _, scale_y, _, _ = get_viewport(screen)
-    return max(1, int(value * scale_y))
+        t_vert = i / (num_vert - 1)
+        x_bottom_world = world_start_x + t_vert * grid_width_world
+        x_bottom_px = int(x_bottom_world * scale + offset_x)
+        pygame.draw.line(screen, GRID_COLOR, (flucht_x, flucht_y), (x_bottom_px, bottom_px), 1)
 
 def draw_lander(screen: pygame.Surface, lander) -> None:
     ship_poly = [(0, -18), (8, -6), (10, 8), (14, 16), (4, 12), (-4, 12), (-14, 16), (-10, 8), (-8, -6)]
@@ -219,15 +213,17 @@ def draw_lander(screen: pygame.Surface, lander) -> None:
 
     rad = math.radians(lander.angle)
     cos_a, sin_a = math.cos(rad), math.sin(rad)
-    scale_x, scale_y, _, _ = get_viewport(screen)
+    scale, _, offset_x, offset_y = get_viewport(screen)
 
     def transform_points(pts):
         transformed = []
         for px, py in pts:
+            # Rotation korrekt berechnen
             rx = px * cos_a - py * sin_a
             ry = px * sin_a + py * cos_a
-            scr_x = int((lander.x + rx) * scale_x)
-            scr_y = int((lander.y + ry) * scale_y)
+            # FIX: Jetzt wird ry statt py benutzt, damit das Schiff beim Drehen stabil bleibt
+            scr_x = int((lander.x + rx) * scale + offset_x)
+            scr_y = int((lander.y + ry) * scale + offset_y)
             transformed.append((scr_x, scr_y))
         return transformed
 
@@ -321,6 +317,8 @@ def draw_landing_pad(screen: pygame.Surface, game_state) -> None:
     pad_end = world_to_screen(game_state.pad_x_end, game_state.pad_y, screen)
     
     glow_width = pad_end[0] - pad_start[0]
+    if glow_width <= 0:
+        return
     glow_surf = pygame.Surface((glow_width, 16), pygame.SRCALPHA)
     for h in range(16):
         alpha = int(110 * (1.0 - h / 16))
@@ -333,7 +331,8 @@ def draw_landing_pad(screen: pygame.Surface, game_state) -> None:
 
 def draw_controls(screen: pygame.Surface, font: pygame.font.Font, inputs: dict) -> None:
     width, height = screen.get_size()
-    btn_w, btn_h = 180, 70
+    # ANPASSUNG: Höhe von 70 auf 175 erhöht (2,5x größer) für barrierefreies Drücken
+    btn_w, btn_h = 180, 175
     margin = 20
     bottom_y = height - btn_h - margin
     middle_y = (height - btn_h) // 2
@@ -351,8 +350,8 @@ def draw_controls(screen: pygame.Surface, font: pygame.font.Font, inputs: dict) 
         border_color = WHITE if is_pressed else GRID_COLOR
         
         btn_surf = pygame.Surface((btn_w, btn_h), pygame.SRCALPHA)
-        pygame.draw.rect(btn_surf, bg_color, (0, 0, btn_w, btn_h), border_radius=6)
-        pygame.draw.rect(btn_surf, border_color, (0, 0, btn_w, btn_h), width=2, border_radius=6)
+        pygame.draw.rect(btn_surf, bg_color, (0, 0, btn_w, btn_h), border_radius=8)
+        pygame.draw.rect(btn_surf, border_color, (0, 0, btn_w, btn_h), width=2, border_radius=8)
         
         txt_surf = font.render(text, True, WHITE)
         txt_rect = txt_surf.get_rect(center=(btn_w // 2, btn_h // 2))
@@ -362,7 +361,9 @@ def draw_controls(screen: pygame.Surface, font: pygame.font.Font, inputs: dict) 
 def draw_screen(screen, font, header_font, game_state, current_inputs=None):
     init_background_data()
     
-    # Renderreihenfolge: Himmel -> Sonne -> Berge -> Bodengitter (für die perfekte Schichtung)
+    # Bildschirmhintergrund leeren, um Ränder bei zentriertem Viewport sauber zu halten
+    screen.fill(BLACK)
+    
     draw_retro_sky(screen)
     draw_retro_sun(screen)
     draw_retro_mountains(screen)
@@ -395,5 +396,5 @@ def draw_screen(screen, font, header_font, game_state, current_inputs=None):
         txt_surf = header_font.render("CRASH", True, RED)
         screen.blit(txt_surf, txt_surf.get_rect(center=(screen_width // 2, screen_height // 2)))
     elif lander.has_landed:
-        txt_surf = header_font.render(f"Erfolg! Zeit: ({game_state.flight_time:.1f}s)", True, GREEN)
+        txt_surf = header_font.render(f"ERFOLG! Zeit: ({game_state.flight_time:.1f}s)", True, GREEN)
         screen.blit(txt_surf, txt_surf.get_rect(center=(screen_width // 2, screen_height // 2)))
