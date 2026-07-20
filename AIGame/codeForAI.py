@@ -3,7 +3,10 @@ import random
 import numpy as np
 import pygame
 
-from game_logic import MAX_FUEL, GameState, WORLD_WIDTH, WORLD_HEIGHT, METEOR_MAX_RADIUS, LANDER_COLLISION_RADIUS
+from game_logic import (
+    MAX_FUEL, GameState, WORLD_WIDTH, WORLD_HEIGHT, METEOR_MAX_RADIUS, LANDER_COLLISION_RADIUS,
+    SAFE_LANDING_VX, SAFE_LANDING_VY
+)
 from HumanGame.rendering import draw_screen
 
 PHYSICS_FPS = 60
@@ -13,6 +16,23 @@ VELOCITY_NORM = 300.0
 # Sicherheitsabstand zum Meteor, ab dem eine Annäherung bestraft wird
 METEOR_SAFE_MARGIN = 80.0
 METEOR_AVOIDANCE_WEIGHT = 4.0
+
+# Ziel-Geschwindigkeit soll asymptotisch gegen die für eine Landung zulässige Geschwindigkeit laufen,
+# je näher der Lander der Plattform kommt (statt gegen 0), und sich für große Distanzen MAX_APPROACH_SPEED annähern.
+# MAX_APPROACH_SPEED: erlaubte Geschwindigkeit bei großer Entfernung (Asymptote für distance -> groß)
+# SPEED_DISTANCE_SCALE: steuert, wie schnell die Ziel-Geschwindigkeit mit sinkender Distanz abfällt
+# SAFE_LANDING_SPEED_MARGIN: Sicherheitsmarge unter dem Landungs-Threshold, damit kleine Abweichungen
+# den Grenzwert für eine erfolgreiche Landung nicht direkt reißen
+MAX_APPROACH_SPEED = 150.0
+SPEED_DISTANCE_SCALE = 0.3
+SAFE_LANDING_SPEED_MARGIN = 0.8
+TARGET_LANDING_VY = SAFE_LANDING_SPEED_MARGIN * SAFE_LANDING_VY
+TARGET_LANDING_VX = SAFE_LANDING_SPEED_MARGIN * SAFE_LANDING_VX
+
+# Bestrafung der Rotation soll mit der Nähe zur Plattform skalieren:
+# weit weg -> Rotation kaum bestraft, nah an der Plattform -> Rotation stark bestraft (stabil bleiben)
+MAX_ANGLE_PENALTY_WEIGHT = 3.0
+ANGLE_DISTANCE_SCALE = 0.3
 
 class LunarLanderEnv:
     def __init__(self, render_mode=False):
@@ -112,20 +132,28 @@ class LunarLanderEnv:
         else:
             reward += abs(lander.vx) / 100.0
 
-        # Lander soll langsam und gerade bleiben
-        height_above_pad = max(0, self.game_state.pad_y - lander.y)
-
-        # Ziel: weiter oben schneller sinken, nahe Plattform langsamer sinken
-        if height_above_pad > 250:
-            target_vy = 120
-        elif height_above_pad > 100:
-            target_vy = 80
+        # Lander soll langsam und gerade bleiben.
+        # Ziel-Geschwindigkeit läuft asymptotisch gegen den (leicht abgesenkten) Landungs-Threshold,
+        # je näher der Lander der Plattform kommt, und nähert sich MAX_APPROACH_SPEED für große Distanzen an.
+        # Sobald der Lander horizontal über der Plattform ist, zählt dafür nur noch die reine Höhe
+        # über der Plattform (nicht die kombinierte 2D-Distanz), damit die Ziel-Geschwindigkeit dort
+        # wirklich gegen den Threshold geht. Horizontale und vertikale Geschwindigkeit werden getrennt
+        # bewertet, da für die Landung unterschiedliche Schwellwerte gelten (SAFE_LANDING_VX/VY).
+        if self.game_state.pad_x_start <= lander.x <= self.game_state.pad_x_end:
+            speed_distance = max(0.0, self.game_state.pad_y - lander.y) / WORLD_HEIGHT
         else:
-            target_vy = 35
+            speed_distance = current_distance
 
-        # vy ist positiv nach unten
-        reward -= abs(lander.vy - target_vy) / 100.0
-        reward -= angle_error * 1.0
+        approach_factor = 1 - math.exp(-speed_distance / SPEED_DISTANCE_SCALE)
+        target_vy = TARGET_LANDING_VY + (MAX_APPROACH_SPEED - TARGET_LANDING_VY) * approach_factor
+        target_vx = TARGET_LANDING_VX + (MAX_APPROACH_SPEED - TARGET_LANDING_VX) * approach_factor
+
+        reward -= abs(abs(lander.vy) - target_vy) / 100.0
+        reward -= abs(abs(lander.vx) - target_vx) / 100.0
+
+        # Rotationsstrafe skaliert mit der Nähe zur Plattform (nah -> hohe Strafe, weit weg -> geringe Strafe)
+        angle_penalty_weight = MAX_ANGLE_PENALTY_WEIGHT * math.exp(-current_distance / ANGLE_DISTANCE_SCALE)
+        reward -= angle_error * angle_penalty_weight
 
         # Abstand zum Meteor bestrafen, sobald er den Sicherheitsabstand unterschreitet
         meteor = self.game_state.meteor

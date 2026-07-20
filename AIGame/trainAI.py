@@ -32,7 +32,7 @@ MIN_REPLAY_SIZE = 1000
 EPSILON_START = 1.0
 EPSILON_END = 0.05
 EPSILON_DECAY = 0.995
-EPISODES_TO_TRAIN = 1000 # Trainiere so viele Episoden
+EPISODES_TO_TRAIN = 1500 # Trainiere so viele Episoden
 
 def save_graph(episode_rewards: list, epsilon_values: list):
     window = 50
