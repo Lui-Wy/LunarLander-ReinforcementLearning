@@ -1,6 +1,10 @@
 import pygame
 import math
-from game_logic import WORLD_WIDTH, WORLD_HEIGHT
+from game_logic import WORLD_WIDTH, WORLD_HEIGHT, LANDER_COLLISION_RADIUS, METEOR_SAFE_MARGIN
+
+# Globale Flag: Zeigt den Radius um den Meteor an, ab dem der Lander beeinflusst wird
+# (Sicherheitsabstand, der auch im KI-Reward zum Ausweichen verwendet wird).
+SHOW_METEOR_DANGER_RADIUS = False
 
 WHITE = (255, 255, 255)
 GREY = (100, 100, 100)
@@ -12,6 +16,7 @@ METEOR_COLOR = (170, 130, 90)
 METEOR_TRAIL_COLOR = (110, 85, 60)
 METEOR_STREAK_COLOR = (90, 65, 45)
 METEOR_STREAK_TIME_FACTOR = 0.5
+METEOR_DANGER_RADIUS_COLOR = (255, 90, 90)
 
 
 def get_viewport(screen: pygame.Surface) -> tuple[float, int, int]:
@@ -277,6 +282,17 @@ def draw_meteor(screen: pygame.Surface, meteor) -> None:
         world_to_screen(meteor.x, meteor.y, screen),
         scale_length(meteor.radius, screen)
     )
+
+    if SHOW_METEOR_DANGER_RADIUS:
+        danger_radius = meteor.radius + LANDER_COLLISION_RADIUS + METEOR_SAFE_MARGIN
+
+        pygame.draw.circle(
+            screen,
+            METEOR_DANGER_RADIUS_COLOR,
+            world_to_screen(meteor.x, meteor.y, screen),
+            scale_length(danger_radius, screen),
+            scale_length(2, screen)
+        )
 
 
 def draw_screen(screen, font, game_state):

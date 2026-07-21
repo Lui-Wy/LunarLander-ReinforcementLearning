@@ -22,7 +22,19 @@ METEOR_MAX_RADIUS = 45
 METEOR_MIN_SPEED = 80
 METEOR_MAX_SPEED = 220
 
+# Der Meteor zielt beim Spawn auf einen zufälligen Punkt innerhalb dieses zentralen Bereichs
+# (statt einer rein zufälligen Richtung), damit seine Flugbahn deutlich häufiger den Bereich
+# kreuzt, in dem sich der Lander tatsächlich bewegt. Enger gefasstes Zielfenster (weiter erhöhte
+# Kreuzungswahrscheinlichkeit) sorgt dafür, dass er noch zuverlässiger nahe der eigentlichen
+# Lander-Flugbahn kreuzt (Geschwindigkeit bleibt unverändert).
+METEOR_TARGET_MARGIN_X = 0.42
+METEOR_TARGET_Y_MIN_FACTOR = 0.20
+METEOR_TARGET_Y_MAX_FACTOR = 0.90
+
 LANDER_COLLISION_RADIUS = 12
+
+# Sicherheitsabstand zum Meteor, ab dem der Lander (im Reward bzw. visuell) beeinflusst wird
+METEOR_SAFE_MARGIN = 80.0
 
 
 class Lander:
@@ -36,6 +48,9 @@ class Lander:
         self.fuel = MAX_FUEL
         self.is_alive = True
         self.has_landed = False
+        # Grund für das Episodenende, sobald is_alive False wird: "meteor", "bad_landing",
+        # "off_pad" oder "out_of_bounds" - fürs Tracking der Erfolgs-/Absturzursachen im Training.
+        self.death_reason = None
 
         self.main_thrust_on = False
         self.left_thrust_on = False
@@ -109,24 +124,30 @@ class Meteor:
 
 
 def spawn_meteor() -> Meteor:
-    """Erzeugt einen Meteor mit zufälliger (aber pro Runde fixer) Größe und Geschwindigkeit."""
+    """
+    Erzeugt einen Meteor mit zufälliger (aber pro Runde fixer) Größe und Geschwindigkeit.
+
+    Der Meteor spawnt an einem zufälligen Bildschirmrand, zielt aber auf einen zufälligen Punkt
+    innerhalb des zentralen Flugbereichs (statt einer rein zufälligen Richtung), sodass seine
+    Flugbahn deutlich häufiger den Bereich kreuzt, in dem sich der Lander tatsächlich bewegt.
+    """
     radius = random.uniform(METEOR_MIN_RADIUS, METEOR_MAX_RADIUS)
     speed = random.uniform(METEOR_MIN_SPEED, METEOR_MAX_SPEED)
     edge = random.choice(("left", "right", "top", "bottom"))
 
     if edge == "left":
         x, y = -radius, random.uniform(0, WORLD_HEIGHT)
-        dx, dy = 1.0, random.uniform(-0.6, 0.6)
     elif edge == "right":
         x, y = WORLD_WIDTH + radius, random.uniform(0, WORLD_HEIGHT)
-        dx, dy = -1.0, random.uniform(-0.6, 0.6)
     elif edge == "top":
         x, y = random.uniform(0, WORLD_WIDTH), -radius
-        dx, dy = random.uniform(-0.6, 0.6), 1.0
     else:
         x, y = random.uniform(0, WORLD_WIDTH), WORLD_HEIGHT + radius
-        dx, dy = random.uniform(-0.6, 0.6), -1.0
 
+    target_x = random.uniform(METEOR_TARGET_MARGIN_X * WORLD_WIDTH, (1 - METEOR_TARGET_MARGIN_X) * WORLD_WIDTH)
+    target_y = random.uniform(METEOR_TARGET_Y_MIN_FACTOR * WORLD_HEIGHT, METEOR_TARGET_Y_MAX_FACTOR * WORLD_HEIGHT)
+
+    dx, dy = target_x - x, target_y - y
     length = math.hypot(dx, dy)
     vx = dx / length * speed
     vy = dy / length * speed
@@ -179,6 +200,8 @@ class GameState:
             dist = math.hypot(lander.x - self.meteor.x, lander.y - self.meteor.y)
             if dist < self.meteor.radius + LANDER_COLLISION_RADIUS:
                 lander.is_alive = False
+                if lander.death_reason is None:
+                    lander.death_reason = "meteor"
 
             if self.meteor.is_off_screen():
                 self.meteor = spawn_meteor()
@@ -195,8 +218,14 @@ class GameState:
                     lander.vx = 0
                 else:
                     lander.is_alive = False
+                    if lander.death_reason is None:
+                        lander.death_reason = "bad_landing"
             else:
                 lander.is_alive = False
+                if lander.death_reason is None:
+                    lander.death_reason = "off_pad"
 
         if lander.x < 0 or lander.x > WORLD_WIDTH or lander.y < 0:
             lander.is_alive = False
+            if lander.death_reason is None:
+                lander.death_reason = "out_of_bounds"
