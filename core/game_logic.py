@@ -1,9 +1,11 @@
 import math
 import random
 
+# --- WELTGRÖSSE ---
 WORLD_WIDTH = 800
 WORLD_HEIGHT = 600
 
+# --- LANDER-PHYSIK ---
 GRAVITY = 180
 THRUST = 500
 ROTATE_SPEED = 180
@@ -11,30 +13,29 @@ MAX_FUEL = 500
 FUEL_REQ_MAIN = 100
 FUEL_REQ_ROTATION = 20
 
-# Akzeptanzwerte für eine erfolgreiche Landung
+# --- LANDUNG: Akzeptanzwerte für eine erfolgreiche Landung ---
 SAFE_LANDING_VY = 80
 SAFE_LANDING_VX = 50
 SAFE_LANDING_ANGLE = 10
 
-# Meteor: Größe/Geschwindigkeit werden bei jedem (Neu-)Spawn zufällig innerhalb dieser Grenzen bestimmt
+# --- KOLLISIONEN & SICHERHEITSABSTÄNDE ---
+LANDER_COLLISION_RADIUS = 12
+
+# Sicherheitsabstand zum Meteor, ab dem der Lander (im Reward bzw. visuell) beeinflusst wird
+METEOR_SAFE_MARGIN = 80.0
+
+# --- METEOR: Größe & Geschwindigkeit (zufällig je Spawn) ---
 METEOR_MIN_RADIUS = 20
 METEOR_MAX_RADIUS = 45
 METEOR_MIN_SPEED = 80
 METEOR_MAX_SPEED = 220
 
-# Der Meteor zielt beim Spawn auf einen zufälligen Punkt innerhalb dieses zentralen Bereichs
-# (statt einer rein zufälligen Richtung), damit seine Flugbahn deutlich häufiger den Bereich
-# kreuzt, in dem sich der Lander tatsächlich bewegt. Enger gefasstes Zielfenster (weiter erhöhte
-# Kreuzungswahrscheinlichkeit) sorgt dafür, dass er noch zuverlässiger nahe der eigentlichen
-# Lander-Flugbahn kreuzt (Geschwindigkeit bleibt unverändert).
+# --- METEOR: Ziel-Flugbahn beim Spawn ---
+# Meteor zielt auf einen Punkt in diesem Fenster statt in eine rein zufällige Richtung, damit er
+# zuverlässig die Lander-Flugbahn kreuzt statt oft daran vorbeizufliegen.
 METEOR_TARGET_MARGIN_X = 0.42
 METEOR_TARGET_Y_MIN_FACTOR = 0.20
 METEOR_TARGET_Y_MAX_FACTOR = 0.90
-
-LANDER_COLLISION_RADIUS = 12
-
-# Sicherheitsabstand zum Meteor, ab dem der Lander (im Reward bzw. visuell) beeinflusst wird
-METEOR_SAFE_MARGIN = 80.0
 
 
 class Lander:
@@ -48,8 +49,7 @@ class Lander:
         self.fuel = MAX_FUEL
         self.is_alive = True
         self.has_landed = False
-        # Grund für das Episodenende, sobald is_alive False wird: "meteor", "bad_landing",
-        # "off_pad" oder "out_of_bounds" - fürs Tracking der Erfolgs-/Absturzursachen im Training.
+        # Absturzursache ("meteor"/"bad_landing"/"off_pad"/"out_of_bounds") fürs Training-Tracking
         self.death_reason = None
 
         self.main_thrust_on = False
@@ -124,13 +124,7 @@ class Meteor:
 
 
 def spawn_meteor() -> Meteor:
-    """
-    Erzeugt einen Meteor mit zufälliger (aber pro Runde fixer) Größe und Geschwindigkeit.
-
-    Der Meteor spawnt an einem zufälligen Bildschirmrand, zielt aber auf einen zufälligen Punkt
-    innerhalb des zentralen Flugbereichs (statt einer rein zufälligen Richtung), sodass seine
-    Flugbahn deutlich häufiger den Bereich kreuzt, in dem sich der Lander tatsächlich bewegt.
-    """
+    """Spawnt am Zufallsrand, zielt aber gezielt in den Flugbereich des Landers (s.o.)."""
     radius = random.uniform(METEOR_MIN_RADIUS, METEOR_MAX_RADIUS)
     speed = random.uniform(METEOR_MIN_SPEED, METEOR_MAX_SPEED)
     edge = random.choice(("left", "right", "top", "bottom"))
@@ -200,6 +194,7 @@ class GameState:
             dist = math.hypot(lander.x - self.meteor.x, lander.y - self.meteor.y)
             if dist < self.meteor.radius + LANDER_COLLISION_RADIUS:
                 lander.is_alive = False
+                # None-Check: erste Absturzursache im Frame gewinnt, spätere überschreiben nicht
                 if lander.death_reason is None:
                     lander.death_reason = "meteor"
 

@@ -1,11 +1,13 @@
 LunarLander-ReinforcementLearning/
 │
-├── game_logic.py
+├── core/
+│   ├── __init__.py
+│   ├── game_logic.py
+│   └── rendering.py
 │
 ├── HumanGame/
 │   ├── __init__.py
-│   ├── main.py
-│   └── rendering.py
+│   └── main.py
 │
 ├── AIGame/
 │   ├── __init__.py
@@ -34,12 +36,15 @@ Installation:
     "pip install -r requirements.txt"
 
     Alternativ können di Packages manuell mit 
-    "pip install pygame numpy stable-baselines3 torch"
+    "pip install pygame numpy torch matplotlib"
     oder 
-    "pip install pygame-ce numpy stable-baselines3 torch"
+    "pip install pygame-ce numpy torch matplotlib"
     installiert werden
 
 VORAB: Alle Befehle werden aus dem Projektverzeichnis ausgeführt.
+
+Ziel des Spiels: sicher auf der grünen Plattform landen (langsam, gerade, zentriert), ohne
+mit dem umherfliegenden Meteor zu kollidieren oder aus dem Bildschirm hinauszufliegen.
 
 Spiel für den Menschen starten:
     "python -m HumanGame.main"
@@ -55,10 +60,15 @@ Spiel für den Menschen starten:
 KI trainieren:
     "python -m AIGame.trainAI"
 
-    Das Modell wird nach abschluss des Trainings in "dataFromTraining.pth" gespeichert. 
+    Existiert bereits "dataFromTraining.pth", wird darauf per Fine-Tuning weitertrainiert
+    (geringere Startexploration), statt komplett neu zu beginnen. Existiert es nicht, startet
+    ein komplett neues Training. Gespeichert wird am Ende jeweils das beste je erreichte Modell
+    (nach Landungsquote), nicht zwangsläufig der allerletzte Trainingsstand.
     !!!Sichere also ältere Trainingsmodelle unter einem anderen Namen, sonst werden diese überschrieben!!!
 
-    Zusätzlich Lernerfolg beim Training (Reward) und der Zufallswert als "training_progress.png" abgespeichert.
+    Zusätzlich wird "training_progress.png" gespeichert: Reward/Epsilon-Verlauf sowie eine
+    Aufschlüsselung der Episoden-Ausgänge (Landung, Meteor-Absturz, Schwellen verfehlt,
+    neben der Plattform, außerhalb der Welt).
 
 Trainierte KI testen:
     "python -m AIGame.realTestOfAI"
@@ -68,8 +78,8 @@ Trainierte KI testen:
 Versus-Modus (KI gegen Mensch, Splitscreen):
     "python -m VersusGame.main"
 
-    verwendet das aktuell unter dem Namen "dataFromTraining_2.pth" gespeicherte Modell für die KI-Seite.
-    Beide Seiten starten in jeder Runde mit identischer Startposition und identischer Plattformposition.
+    verwendet das aktuell unter dem Namen "dataFromTraining.pth" gespeicherte Modell für die KI-Seite.
+    Beide Seiten starten in jeder Runde mit identischer Startposition, Plattformposition und Meteor.
 
     Steuerung (menschliche Seite, rechts):
     | Taste              | Aktion                      |

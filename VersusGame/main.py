@@ -4,23 +4,28 @@ import numpy as np
 import pygame
 import torch
 
-from game_logic import GameState, Lander, Meteor, MAX_FUEL, WORLD_WIDTH, WORLD_HEIGHT, METEOR_MAX_RADIUS, spawn_meteor
-from HumanGame.rendering import draw_screen
+from core.game_logic import GameState, Lander, Meteor, MAX_FUEL, WORLD_WIDTH, WORLD_HEIGHT, METEOR_MAX_RADIUS, spawn_meteor
+from core.rendering import draw_screen
 from AIGame.trainAI import DQN
 
+# --- MODELL-PFAD ---
 MODEL_PATH = "dataFromTraining.pth"
 
+# --- FENSTER & LAYOUT ---
 HEADER_HEIGHT = 40
 SCREEN_WIDTH = WORLD_WIDTH * 2
 SCREEN_HEIGHT = WORLD_HEIGHT + HEADER_HEIGHT
 FPS = 60
 
+# --- PHYSIK-TIMING ---
 PHYSICS_FPS = 60
 PHYSICS_DT = 1.0 / PHYSICS_FPS
 MAX_FRAME_TIME = 0.25
 
+# --- NORMALISIERUNG (für die KI-Observation) ---
 VELOCITY_NORM = 300.0
 
+# --- FARBEN ---
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GREY = (60, 60, 60)
@@ -85,11 +90,7 @@ def reset_round(ai_state: GameState, human_state: GameState) -> None:
 
 
 def sync_meteor_respawn(ai_state: GameState, human_state: GameState, last_meteor_id: int) -> int:
-    """
-    Hält den Meteor auf beiden Seiten synchron, falls er (weil komplett vom
-    Bildschirm verschwunden) zwischenzeitlich neu gespawnt wurde. Die KI-Seite
-    dient dabei als Referenz, deren neuer Meteor auf die Mensch-Seite kopiert wird.
-    """
+    """Kopiert Meteor-Respawns von der KI- auf die Mensch-Seite, damit beide synchron bleiben."""
     if id(ai_state.meteor) != last_meteor_id:
         human_state.meteor = Meteor(
             ai_state.meteor.x,

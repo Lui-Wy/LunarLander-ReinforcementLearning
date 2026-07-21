@@ -1,11 +1,12 @@
 import pygame
 import math
-from game_logic import WORLD_WIDTH, WORLD_HEIGHT, LANDER_COLLISION_RADIUS, METEOR_SAFE_MARGIN
+from core.game_logic import WORLD_WIDTH, WORLD_HEIGHT, LANDER_COLLISION_RADIUS, METEOR_SAFE_MARGIN
 
-# Globale Flag: Zeigt den Radius um den Meteor an, ab dem der Lander beeinflusst wird
-# (Sicherheitsabstand, der auch im KI-Reward zum Ausweichen verwendet wird).
+# --- FEATURE-FLAGS ---
+# Zeigt den Meteor-Sicherheitsabstand an, der auch im KI-Reward fürs Ausweichen gilt
 SHOW_METEOR_DANGER_RADIUS = False
 
+# --- FARBEN ---
 WHITE = (255, 255, 255)
 GREY = (100, 100, 100)
 BLACK = (0, 0, 0)
@@ -15,26 +16,14 @@ YELLOW = (255, 255, 0)
 METEOR_COLOR = (170, 130, 90)
 METEOR_TRAIL_COLOR = (110, 85, 60)
 METEOR_STREAK_COLOR = (90, 65, 45)
-METEOR_STREAK_TIME_FACTOR = 0.5
 METEOR_DANGER_RADIUS_COLOR = (255, 90, 90)
+
+# --- METEOR-RENDERING-TUNING ---
+METEOR_STREAK_TIME_FACTOR = 0.5
 
 
 def get_viewport(screen: pygame.Surface) -> tuple[float, int, int]:
-    """
-    Berechnet den sichtbaren Viewport für das Spielfeld.
-
-    Der Viewport behält das Seitenverhältnis der Logikwelt bei.
-    Bereiche außerhalb des Viewports bleiben als Rand sichtbar.
-
-    Args:
-        screen (pygame.Surface): Aktuelles Pygame-Fenster.
-
-    Returns:
-        tuple[float, int, int]:
-            scale: Skalierungsfaktor von Worldspace zu Screenspace.
-            offset_x: Horizontale Verschiebung des Viewports.
-            offset_y: Vertikale Verschiebung des Viewports.
-    """
+    """Skalierung + Offset, damit das Seitenverhältnis der Welt bei jeder Fenstergröße erhalten bleibt."""
     screen_width, screen_height = screen.get_size()
 
     scale = min(
@@ -52,32 +41,13 @@ def get_viewport(screen: pygame.Surface) -> tuple[float, int, int]:
 
 
 def world_to_screen(x: float, y: float, screen: pygame.Surface) -> tuple[int, int]:
-    """
-    Wandelt eine Worldspace-Koordinate in eine Screenspace-Koordinate um.
-
-    Args:
-        x (float): X-Koordinate im Worldspace.
-        y (float): Y-Koordinate im Worldspace.
-        screen (pygame.Surface): Aktuelles Pygame-Fenster.
-
-    Returns:
-        tuple[int, int]: Umgerechnete X- und Y-Koordinate im Screenspace.
-    """
+    """Worldspace- in Screenspace-Koordinate umrechnen."""
     scale, offset_x, offset_y = get_viewport(screen)
     return int(offset_x + x * scale), int(offset_y + y * scale)
 
 
 def scale_length(value: float, screen: pygame.Surface) -> int:
-    """
-    Skaliert eine Länge aus dem Worldspace in den Screenspace.
-
-    Args:
-        value (float): Länge im Worldspace.
-        screen (pygame.Surface): Aktuelles Pygame-Fenster.
-
-    Returns:
-        int: Skalierte Länge im Screenspace.
-    """
+    """Länge von Worldspace in Screenspace skalieren."""
     scale, _, _ = get_viewport(screen)
     return max(1, int(value * scale))
 
@@ -90,20 +60,7 @@ def draw_text(
     y: float,
     color: tuple[int, int, int]
 ) -> None:
-    """
-    Zeichnet Text an einer bestimmten Worldspace-Koordinate.
-
-    Args:
-        screen (pygame.Surface): Oberfläche, auf die gezeichnet wird.
-        font (pygame.font.Font): Schriftart für den Text.
-        text (str): Darzustellender Text.
-        x (float): X-Koordinate im Worldspace.
-        y (float): Y-Koordinate im Worldspace.
-        color (tuple[int, int, int]): Textfarbe als RGB-Tupel.
-
-    Returns:
-        None
-    """
+    """Text an einer Worldspace-Koordinate zeichnen."""
     sx, sy = world_to_screen(x, y, screen)
     screen.blit(font.render(text, True, color), (sx, sy))
 
@@ -114,18 +71,7 @@ def draw_centered_text(
     text: str,
     color: tuple[int, int, int]
 ) -> None:
-    """
-    Zeichnet Text zentriert in der Mitte des Spielfeld-Viewports.
-
-    Args:
-        screen (pygame.Surface): Oberfläche, auf die gezeichnet wird.
-        font (pygame.font.Font): Schriftart für den Text.
-        text (str): Darzustellender Text.
-        color (tuple[int, int, int]): Textfarbe als RGB-Tupel.
-
-    Returns:
-        None
-    """
+    """Text zentriert im Spielfeld-Viewport zeichnen (z.B. Crash-/Erfolgsmeldung)."""
     scale, offset_x, offset_y = get_viewport(screen)
 
     viewport_width = int(WORLD_WIDTH * scale)
@@ -143,16 +89,7 @@ def draw_centered_text(
 
 
 def draw_lander(screen: pygame.Surface, lander) -> None:
-    """
-    Zeichnet den Lander inklusive Rotation und Triebwerksflamme.
-
-    Args:
-        screen (pygame.Surface): Oberfläche, auf die gezeichnet wird.
-        lander: Lander-Objekt mit Position, Geschwindigkeit, Winkel und Zustand.
-
-    Returns:
-        None
-    """
+    """Lander inkl. Rotation und Triebwerksflamme zeichnen; Farbe zeigt Zustand (ok/gelandet/crash)."""
     points = [
         (0, -15),
         (-10, 15),
@@ -189,22 +126,7 @@ def draw_lander(screen: pygame.Surface, lander) -> None:
 
 
 def get_streak_triangle(meteor, attach_offset: float, length_factor: float):
-    """
-    Berechnet die drei Eckpunkte eines Schweif-Dreiecks im Worldspace.
-
-    Beide Basispunkte liegen exakt auf dem Meteorrand (Abstand = Radius vom
-    Mittelpunkt), sodass keine Ecke seitlich über die Kugel hinausragt. Die
-    Spitze zeigt für alle Dreiecke exakt entgegen der Flugrichtung. Länge und
-    Basisbreite skalieren mit der Meteorgeschwindigkeit.
-
-    Args:
-        meteor: Meteor-Objekt mit Position, Geschwindigkeit und Radius.
-        attach_offset (float): Winkel-Offset des Ansatzpunkts auf dem Meteorrand in Grad.
-        length_factor (float): Individueller Längen-/Breitenfaktor dieses Dreiecks.
-
-    Returns:
-        tuple: Drei (x, y) Worldspace-Punkte des Dreiecks.
-    """
+    """Eckpunkte eines Schweif-Dreiecks; Basis liegt auf dem Meteorrand, Spitze zeigt entgegen der Flugrichtung."""
     speed = math.hypot(meteor.vx, meteor.vy)
     backward_angle = math.atan2(meteor.vy, meteor.vx) + math.pi
     back_x, back_y = math.cos(backward_angle), math.sin(backward_angle)
@@ -239,17 +161,7 @@ def get_streak_triangle(meteor, attach_offset: float, length_factor: float):
 
 
 def draw_meteor(screen: pygame.Surface, meteor) -> None:
-    """
-    Zeichnet den Meteor als Kugel mit Schweif-Dreiecken und einem ausblendenden
-    Staubstreifen, die Flugrichtung und Geschwindigkeit erkennbar machen.
-
-    Args:
-        screen (pygame.Surface): Oberfläche, auf die gezeichnet wird.
-        meteor: Meteor-Objekt mit Position, Radius und Bewegungsspur.
-
-    Returns:
-        None
-    """
+    """Meteor mit Schweif-Dreiecken und Staubspur zeichnen, damit Richtung/Geschwindigkeit erkennbar sind."""
     for angle_offset, length_factor in meteor.streaks:
         p1, p2, p3 = get_streak_triangle(meteor, angle_offset, length_factor)
 

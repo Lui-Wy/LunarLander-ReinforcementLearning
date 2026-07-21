@@ -1,13 +1,15 @@
 import pygame
 import sys
 
-from game_logic import GameState
-from HumanGame.rendering import draw_screen
+from core.game_logic import GameState
+from core.rendering import draw_screen
 
+# --- FENSTER ---
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 FPS = 60
 
+# --- PHYSIK-TIMING ---
 PHYSICS_FPS = 60
 PHYSICS_DT = 1.0 / PHYSICS_FPS
 MAX_FRAME_TIME = 0.25

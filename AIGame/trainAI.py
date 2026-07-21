@@ -36,17 +36,16 @@ EPSILON_END = 0.05
 EPSILON_DECAY = 0.995
 EPISODES_TO_TRAIN = 4000 # Trainiere so viele Episoden
 
+# --- MODELL-PFAD & FINE-TUNING ---
 MODEL_PATH = "dataFromTraining.pth"
 
-# Fine-Tuning: statt komplett neu zu trainieren, vorhandene Gewichte aus MODEL_PATH laden und mit
-# geringerer Startexploration weitertrainieren - z.B. um nur das Landeverhalten zu verfeinern,
-# ohne das bereits gelernte Ausweichverhalten zu verlernen.
+# Vorhandene Gewichte weitertrainieren (geringere Startexploration) statt komplett neu zu lernen
 FINE_TUNE_EPISODES = 1500
 FINE_TUNE_EPSILON_START = 0.3
 
-# DQN neigt dazu, eine einmal gute Policy im weiteren Training wieder zu "verlernen" (Oszillation).
-# Statt nur die Gewichte der letzten Episode zu speichern, wird deshalb während des Trainings die
-# beste je erreichte Landungsquote (Rolling-Fenster) getrackt und am Ende dieser Bestand gespeichert.
+# --- BEST-CHECKPOINT ---
+# DQN "verlernt" eine gute Policy oft wieder (Oszillation) - deshalb wird die beste je erreichte
+# Landungsquote getrackt und deren Gewichte gespeichert, statt nur die der letzten Episode
 BEST_CHECKPOINT_WINDOW = 50
 
 def rolling_rate(flags: list, window: int) -> np.ndarray:
@@ -105,9 +104,7 @@ def save_graph(episode_rewards: list, epsilon_values: list, outcomes: list):
     )
     ax1.set_title("Lunar Lander DQN Training")
 
-    # Episoden-Ausgang: Anteil (%) pro 50-Episoden-Fenster, getrennt nach Ursache.
-    # bad_landing (über der Plattform, Schwellen verfehlt) und off_pad (komplett daneben gelandet)
-    # getrennt geplottet, um zu erkennen, welcher der beiden Fehler tatsächlich überwiegt.
+    # bad_landing/off_pad getrennt geplottet, um zu sehen welcher der beiden Fehler überwiegt
     landed = [1 if o == "landed" else 0 for o in outcomes]
     meteor_crash = [1 if o == "meteor" else 0 for o in outcomes]
     bad_landing = [1 if o == "bad_landing" else 0 for o in outcomes]
@@ -201,9 +198,8 @@ def train(episodes: int, epsilon_start: float, load_existing: bool):
                 # Aktuelle Q-Werte berechnen
                 current_q = q_net(states_t).gather(1, actions_t)
                 
-                # Target Q-Werte berechnen (Bellman-Gleichung, Double DQN):
-                # Aktion wird vom Online-Netz gewählt, aber vom Target-Netz bewertet, um die
-                # sonst übliche Überschätzung (beides vom selben Netz) zu vermeiden.
+                # Double DQN: Aktion vom Online-Netz gewählt, vom Target-Netz bewertet (vermeidet
+                # die Überschätzung, die entsteht wenn ein Netz beides selbst macht)
                 with torch.no_grad():
                     best_actions = q_net(next_states_t).argmax(1, keepdim=True)
                     next_q = target_net(next_states_t).gather(1, best_actions)
@@ -228,9 +224,7 @@ def train(episodes: int, epsilon_start: float, load_existing: bool):
         else:
             outcomes.append(lander.death_reason or "unknown")
 
-        # Bestes Modell festhalten: sobald die Landungsquote im Rolling-Fenster einen neuen
-        # Bestwert erreicht, wird eine Kopie der aktuellen Gewichte gesichert. So geht die beste
-        # Policy nicht verloren, falls das Training danach wieder schlechter wird.
+        # Bei neuem Bestwert Gewichte sichern, damit die beste Policy nicht verloren geht
         if len(outcomes) >= BEST_CHECKPOINT_WINDOW:
             recent_for_best = outcomes[-BEST_CHECKPOINT_WINDOW:]
             current_landed_rate = recent_for_best.count("landed") / BEST_CHECKPOINT_WINDOW * 100.0
@@ -255,8 +249,7 @@ def train(episodes: int, epsilon_start: float, load_existing: bool):
                 f"Außerhalb-Welt(50): {out_of_bounds_rate:.0f}%"
             )
 
-    # Bestes je erreichtes Modell speichern (falls das Rolling-Fenster nie erreicht wurde,
-    # z.B. bei sehr kurzen Testläufen, wird ersatzweise der aktuelle Stand gespeichert)
+    # Fallback auf aktuellen Stand, falls das Rolling-Fenster nie erreicht wurde (z.B. Kurztest)
     if best_state_dict is not None:
         torch.save(best_state_dict, MODEL_PATH)
         print(f"Bestes Modell gespeichert (Landung(50): {best_landed_rate:.0f}%).")
@@ -269,19 +262,12 @@ def train(episodes: int, epsilon_start: float, load_existing: bool):
 
 
 def fine_tune(episodes: int = FINE_TUNE_EPISODES, epsilon_start: float = FINE_TUNE_EPSILON_START):
-    """
-    Lädt die vorhandenen Gewichte aus MODEL_PATH und trainiert mit geringerer Startexploration
-    weiter, statt komplett neu zu beginnen - z.B. um nur das Landeverhalten zu verfeinern, ohne
-    bereits gelerntes Ausweichverhalten zu verlernen.
-    """
+    """Trainiert MODEL_PATH weiter statt komplett neu, um Bekanntes nicht zu verlernen."""
     train(episodes=episodes, epsilon_start=epsilon_start, load_existing=True)
 
 
 def main():
-    """
-    Einheitlicher Einstiegspunkt: existiert bereits ein Modell unter MODEL_PATH, wird darauf per
-    Fine-Tuning weitertrainiert. Andernfalls wird ein komplett neues Modell von Null trainiert.
-    """
+    """Fine-tuned MODEL_PATH falls vorhanden, sonst komplett neues Training."""
     if os.path.exists(MODEL_PATH):
         fine_tune()
     else:

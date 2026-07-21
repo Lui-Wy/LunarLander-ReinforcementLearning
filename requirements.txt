@@ -1,6 +1,5 @@
 pygame-ce
 numpy
-stable-baselines3
 torch
 pygame
 matplotlib
