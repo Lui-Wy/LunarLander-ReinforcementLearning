@@ -1,3 +1,6 @@
+Das Endergebnis unseres Projekts ist im Browser (Handy-optimiert) spielbar unter: 
+https://lui-wy.github.io/LunarLander-ReinforcementLearning/BrowserGame_VersusMode/BrowserGame_VS/
+
 LunarLander-ReinforcementLearning/
 │
 ├── core/
